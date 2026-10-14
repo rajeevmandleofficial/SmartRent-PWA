@@ -16,6 +16,10 @@ DEBUG = config('DEBUG', default=True, cast=bool)
 
 ALLOWED_HOSTS = [host.strip() for host in config('ALLOWED_HOSTS', default='localhost,127.0.0.1,*').split(',')]
 CSRF_TRUSTED_ORIGINS = [
+    'https://*.loca.lt',
+    'https://*.lhr.life',
+    'https://*.localhost.run',
+    'https://*.pinggy.link',
     'https://*.onrender.com',
     'https://*.railway.app',
     'http://localhost:8000',
@@ -140,4 +144,6 @@ X_FRAME_OPTIONS = 'DENY'
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
 SESSION_COOKIE_HTTPONLY = True
-CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = False
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
