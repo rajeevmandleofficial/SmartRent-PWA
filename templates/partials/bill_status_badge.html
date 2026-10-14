@@ -1,15 +1,23 @@
 {% if bill.payment_status == 'PAID' %}
 <button hx-post="{% url 'bill_toggle_status' bill.pk %}"
         hx-swap="outerHTML"
-        title="Click to mark Pending"
+        title="Click to reset to Pending"
         class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-all cursor-pointer shadow-sm group">
     <i class="fa-solid fa-circle-check text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform"></i>
-    <span>Paid (Jama)</span>
+    <span>Paid (Pura Jama)</span>
+</button>
+{% elif bill.payment_status == 'PARTIAL' %}
+<button hx-post="{% url 'bill_toggle_status' bill.pk %}"
+        hx-swap="outerHTML"
+        title="Click to mark Full Paid"
+        class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-400 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/60 transition-all cursor-pointer shadow-sm group">
+    <i class="fa-solid fa-clock-rotate-left text-sky-500 group-hover:scale-110 transition-transform"></i>
+    <span>Partial (₹{{ bill.paid_amount }} Recvd)</span>
 </button>
 {% else %}
 <button hx-post="{% url 'bill_toggle_status' bill.pk %}"
         hx-swap="outerHTML"
-        title="Click to mark Paid"
+        title="Click to mark Full Paid"
         class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/60 transition-all cursor-pointer shadow-sm group">
     <i class="fa-solid fa-clock text-amber-500 group-hover:scale-110 transition-transform"></i>
     <span>Pending (Baaki)</span>

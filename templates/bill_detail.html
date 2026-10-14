@@ -3,7 +3,7 @@
 {% block title %}Bill #{{ bill.receipt_number }} | SmartRent{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto space-y-6">
+<div class="max-w-4xl mx-auto space-y-6" x-data="{ paymentModal: false }">
     <!-- Breadcrumb & Top Bar -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -11,11 +11,10 @@
                 <i class="fa-solid fa-arrow-left"></i>
                 <span>Back to Bills Ledger</span>
             </a>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 flex-wrap">
                 <h1 class="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight font-mono">
                     {{ bill.receipt_number }}
                 </h1>
-                <!-- 1-Click Status Toggle HTMX -->
                 <div id="bill-status-wrapper">
                     {% include 'partials/bill_status_badge.html' with bill=bill %}
                 </div>
@@ -27,18 +26,25 @@
 
         <!-- Action Buttons -->
         <div class="flex items-center gap-2 flex-wrap">
+            <!-- Record Payment Button -->
+            <button type="button" @click="paymentModal = true"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/25 active:scale-95 transition-all">
+                <i class="fa-solid fa-money-bill-wave"></i>
+                <span>Record Payment</span>
+            </button>
+
             <!-- WhatsApp Reminder Button -->
             <a href="{{ bill.whatsapp_url }}" target="_blank" rel="noopener noreferrer"
                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/25 active:scale-95 transition-all">
                 <i class="fa-brands fa-whatsapp text-lg"></i>
-                <span>Send WhatsApp Reminder</span>
+                <span>WhatsApp</span>
             </a>
 
             <!-- Download PDF Receipt -->
             <a href="{% url 'bill_receipt_pdf' bill.pk %}" target="_blank"
-               class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-brand-600 hover:bg-brand-500 text-white shadow-md shadow-brand-600/25 active:scale-95 transition-all">
-                <i class="fa-solid fa-file-pdf"></i>
-                <span>Download PDF Receipt</span>
+               class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-slate-800 hover:bg-slate-700 text-white shadow-sm active:scale-95 transition-all">
+                <i class="fa-solid fa-file-pdf text-rose-400"></i>
+                <span>Download PDF</span>
             </a>
 
             <!-- Delete Bill -->
@@ -52,14 +58,14 @@
 
     <!-- Bill Overview Grid -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <!-- Room & Property Info -->
+        <!-- Room Info -->
         <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
             <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Property Details</span>
             <div>
                 <a href="{% url 'room_detail' bill.room.pk %}" class="text-lg font-extrabold text-slate-900 dark:text-white hover:text-brand-600 transition-colors">
                     Room {{ bill.room.room_number }}
                 </a>
-                <p class="text-xs text-slate-500">{{ bill.room.get_property_type_display }}</p>
+                <p class="text-xs text-slate-500">{{ bill.room.floor }} • {{ bill.room.get_property_type_display }}</p>
             </div>
             <div class="pt-2 border-t border-slate-100 dark:border-slate-800 text-xs space-y-1">
                 <div class="flex justify-between">
@@ -80,48 +86,50 @@
                 <a href="{% url 'tenant_detail' bill.tenant.pk %}" class="text-lg font-extrabold text-slate-900 dark:text-white hover:text-brand-600 transition-colors">
                     {{ bill.tenant.full_name }}
                 </a>
-                <p class="text-xs font-mono text-slate-500 font-semibold">{{ bill.tenant.mobile_number }}</p>
+                <p class="text-xs font-mono text-slate-500 font-semibold">+91 {{ bill.tenant.mobile_number }}</p>
             </div>
             <div class="pt-2 border-t border-slate-100 dark:border-slate-800 text-xs space-y-1">
                 <div class="flex justify-between">
-                    <span class="text-slate-400">Move-in Date:</span>
-                    <span class="font-semibold">{{ bill.tenant.move_in_date|date:"d M, Y" }}</span>
+                    <span class="text-slate-400">Security Deposit:</span>
+                    <span class="font-bold text-indigo-600">₹{{ bill.tenant.security_deposit }}</span>
                 </div>
                 <div class="flex justify-between">
-                    <span class="text-slate-400">Document Vault:</span>
-                    <span class="font-bold text-emerald-600 dark:text-emerald-400">Verified</span>
+                    <span class="text-slate-400">Move-in:</span>
+                    <span class="font-semibold">{{ bill.tenant.move_in_date|date:"d M, Y" }}</span>
                 </div>
             </div>
         </div>
 
-        <!-- Total Bill Card -->
-        <div class="p-5 rounded-2xl bg-gradient-to-br from-indigo-900 to-slate-900 text-white border border-indigo-800/80 shadow-md flex flex-col justify-between">
+        <!-- Total Bill & Balance Card -->
+        <div class="p-5 rounded-2xl bg-gradient-to-br from-indigo-950 to-slate-900 text-white border border-indigo-800/80 shadow-md flex flex-col justify-between">
             <div>
-                <span class="text-xs font-bold uppercase tracking-wider text-indigo-300">Total Amount Due</span>
-                <p class="text-3xl font-extrabold font-mono mt-1 text-white">₹{{ bill.total_bill }}</p>
-                <p class="text-xs text-indigo-300 mt-1">Month: {{ bill.billing_month }}</p>
+                <span class="text-xs font-bold uppercase tracking-wider text-indigo-300">Payment Balance</span>
+                <div class="mt-1 flex items-baseline justify-between">
+                    <div>
+                        <p class="text-3xl font-extrabold font-mono text-white">₹{{ bill.total_bill }}</p>
+                        <p class="text-xs text-indigo-300">Total Billed</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-2xl font-extrabold font-mono {% if bill.balance_amount > 0 %}text-amber-400{% else %}text-emerald-400{% endif %}">
+                            ₹{{ bill.balance_amount }}
+                        </p>
+                        <p class="text-[11px] text-indigo-300">Remaining Due</p>
+                    </div>
+                </div>
             </div>
             <div class="mt-4 pt-3 border-t border-indigo-800/60 flex items-center justify-between text-xs">
-                <span class="text-indigo-300">Status:</span>
-                {% if bill.payment_status == 'PAID' %}
-                <span class="font-bold text-emerald-300 flex items-center gap-1">
-                    <i class="fa-solid fa-circle-check"></i> Paid on {{ bill.paid_on|date:"d M Y" }}
-                </span>
-                {% else %}
-                <span class="font-bold text-amber-300 flex items-center gap-1">
-                    <i class="fa-solid fa-clock"></i> Unpaid / Due
-                </span>
-                {% endif %}
+                <span class="text-indigo-300">Paid so far:</span>
+                <span class="font-bold font-mono text-emerald-400">₹{{ bill.paid_amount }}</span>
             </div>
         </div>
     </div>
 
-    <!-- Detailed Sub-Meter & Charges Breakdown -->
+    <!-- Sub-Meter Breakdown & Photo Proof -->
     <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
         <div class="p-5 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
             <h2 class="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
                 <i class="fa-solid fa-list-check text-brand-600"></i>
-                <span>Itemized Bill Calculation & Breakdown</span>
+                <span>Itemized Bill Calculation &amp; Sub-Meter Details</span>
             </h2>
             <span class="text-xs font-mono text-slate-400">Receipt #{{ bill.receipt_number }}</span>
         </div>
@@ -155,6 +163,16 @@
                         <p class="font-mono font-extrabold text-indigo-700 dark:text-indigo-300 text-base mt-0.5">₹{{ bill.electricity_bill }}</p>
                     </div>
                 </div>
+
+                <!-- Sub-Meter Photo Proof (if uploaded) -->
+                {% if bill.meter_photo %}
+                <div class="pt-3 border-t border-slate-200 dark:border-slate-700">
+                    <p class="text-[11px] font-bold text-slate-500 uppercase mb-2">📸 Verified Sub-Meter Photograph Proof:</p>
+                    <a href="{{ bill.meter_photo.url }}" target="_blank" class="inline-block rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 hover:opacity-90 transition-opacity">
+                        <img src="{{ bill.meter_photo.url }}" alt="Meter Photo Proof" class="max-h-48 object-cover rounded-xl">
+                    </a>
+                </div>
+                {% endif %}
             </div>
 
             <!-- Full Cost Table -->
@@ -167,35 +185,33 @@
                 </thead>
                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                     <tr>
-                        <td class="py-3 text-slate-700 dark:text-slate-300">
-                            Base Monthly Rent
-                        </td>
-                        <td class="py-3 text-right font-mono font-semibold text-slate-900 dark:text-white">
-                            ₹{{ bill.rent_amount }}
-                        </td>
+                        <td class="py-3 text-slate-700 dark:text-slate-300">Base Monthly Rent</td>
+                        <td class="py-3 text-right font-mono font-semibold text-slate-900 dark:text-white">₹{{ bill.rent_amount }}</td>
                     </tr>
                     <tr>
                         <td class="py-3 text-slate-700 dark:text-slate-300">
                             Sub-Meter Electricity Charge ({{ bill.units_consumed }} units @ ₹{{ bill.rate_per_unit }})
                         </td>
-                        <td class="py-3 text-right font-mono font-semibold text-slate-900 dark:text-white">
-                            ₹{{ bill.electricity_bill }}
-                        </td>
+                        <td class="py-3 text-right font-mono font-semibold text-slate-900 dark:text-white">₹{{ bill.electricity_bill }}</td>
                     </tr>
                     <tr>
-                        <td class="py-3 text-slate-700 dark:text-slate-300">
-                            Maintenance / Society Charges
-                        </td>
-                        <td class="py-3 text-right font-mono font-semibold text-slate-900 dark:text-white">
-                            ₹{{ bill.maintenance_amount }}
-                        </td>
+                        <td class="py-3 text-slate-700 dark:text-slate-300">Maintenance Charges</td>
+                        <td class="py-3 text-right font-mono font-semibold text-slate-900 dark:text-white">₹{{ bill.maintenance_amount }}</td>
                     </tr>
-                    <tr class="border-t-2 border-slate-200 dark:border-slate-700 font-bold text-base">
-                        <td class="py-4 text-slate-900 dark:text-white">
-                            Total Monthly Bill
+                    <tr class="font-bold text-base bg-slate-50 dark:bg-slate-800/40">
+                        <td class="py-3 px-2 text-slate-900 dark:text-white">Total Bill Amount</td>
+                        <td class="py-3 px-2 text-right font-mono font-extrabold text-brand-600 dark:text-brand-400 text-lg">₹{{ bill.total_bill }}</td>
+                    </tr>
+                    <tr>
+                        <td class="py-3 text-emerald-600 dark:text-emerald-400 font-semibold">
+                            Total Paid so far ({% if bill.payment_method %}{{ bill.get_payment_method_display }}{% else %}Cleared{% endif %})
                         </td>
-                        <td class="py-4 text-right font-mono font-extrabold text-brand-600 dark:text-brand-400 text-lg">
-                            ₹{{ bill.total_bill }}
+                        <td class="py-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">- ₹{{ bill.paid_amount }}</td>
+                    </tr>
+                    <tr class="border-t-2 border-slate-300 dark:border-slate-700 font-extrabold text-base">
+                        <td class="py-3 text-slate-900 dark:text-white">Net Balance Due</td>
+                        <td class="py-3 text-right font-mono font-extrabold {% if bill.balance_amount > 0 %}text-rose-600 dark:text-rose-400{% else %}text-emerald-600{% endif %} text-lg">
+                            ₹{{ bill.balance_amount }}
                         </td>
                     </tr>
                 </tbody>
@@ -217,15 +233,60 @@
         </div>
         <div class="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-emerald-100 dark:border-emerald-900/40 text-xs font-mono text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed">
 Namaste {{ bill.tenant.full_name }} ji! 🙏
-Aapka SmartRent monthly bill generate ho gaya hai:
-🏠 Room / Flat: {{ bill.room.room_number }}
-📅 Billing Month: {{ bill.billing_month }}
-⏰ Due Date: {{ bill.due_date|date:"d M, Y" }}
-💰 Monthly Rent: ₹{{ bill.rent_amount }}
-⚡ Sub-Meter: {{ bill.previous_reading }} to {{ bill.current_reading }} ({{ bill.units_consumed }} units = ₹{{ bill.electricity_bill }})
-🛠 Maintenance: ₹{{ bill.maintenance_amount }}
-💵 TOTAL AMOUNT DUE: ₹{{ bill.total_bill }}
-📄 Bill No: {{ bill.receipt_number }}
+Aapka monthly bill generate ho gaya hai:
+🏠 Room: {{ bill.room.room_number }} • Month: {{ bill.billing_month }}
+Due Date: {{ bill.due_date|date:"d M, Y" }}
+Rent: ₹{{ bill.rent_amount }} | Bijli: ₹{{ bill.electricity_bill }} | Maint: ₹{{ bill.maintenance_amount }}
+💵 TOTAL DUE: ₹{{ bill.total_bill }}
+💳 Paid: ₹{{ bill.paid_amount }} | ⚠️ Balance: ₹{{ bill.balance_amount }}
+        </div>
+    </div>
+
+    <!-- Record Payment Modal -->
+    <div x-show="paymentModal" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+        <div @click.outside="paymentModal = false"
+             class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-8 max-w-md w-full space-y-5">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                <h3 class="font-extrabold text-base text-slate-900 dark:text-white">Record Rent Payment</h3>
+                <button @click="paymentModal = false" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form method="post" action="{% url 'bill_record_payment' bill.pk %}" class="space-y-4">
+                {% csrf_token %}
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
+                        Amount Paid (₹) <span class="text-rose-500">*</span>
+                    </label>
+                    <input type="number" step="0.01" name="paid_amount" value="{{ bill.total_bill }}" required
+                           class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold text-lg focus:ring-2 focus:ring-brand-500">
+                    <p class="text-[11px] text-slate-400 mt-1">Total Bill: ₹{{ bill.total_bill }} (Current Balance: ₹{{ bill.balance_amount }})</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">Payment Method</label>
+                    <select name="payment_method" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm">
+                        <option value="UPI" selected>UPI (GPay / PhonePe / Paytm)</option>
+                        <option value="CASH">Cash / Nakad</option>
+                        <option value="BANK_TRANSFER">Bank Transfer / NEFT</option>
+                        <option value="CHEQUE">Cheque</option>
+                        <option value="OTHER">Other</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">UPI Ref / UTR / Note (Optional)</label>
+                    <input type="text" name="payment_reference" placeholder="e.g. UPI Ref #412356789"
+                           class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm">
+                </div>
+
+                <div class="pt-2 flex items-center justify-end gap-2">
+                    <button type="button" @click="paymentModal = false" class="px-4 py-2 text-xs font-bold text-slate-500">Cancel</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-bold shadow-md hover:bg-indigo-500">
+                        Save Payment
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

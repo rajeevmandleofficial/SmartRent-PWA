@@ -1,19 +1,25 @@
 from decimal import Decimal
+import os
+import csv
+import mimetypes
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login, logout, authenticate
+from django.contrib.auth import login, logout
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import JsonResponse, HttpResponse, Http404
-from django.db.models import Sum, Count, Q
+from django.http import JsonResponse, HttpResponse, HttpResponseForbidden, FileResponse, Http404
+from django.db.models import Sum, Q
 from django.utils import timezone
-from .models import Room, Tenant, MonthlyBill
-from .forms import RoomForm, TenantForm, MonthlyBillForm, LandlordRegistrationForm
+from .models import Room, Tenant, MonthlyBill, LandlordProfile
+from .forms import (
+    RoomForm, TenantForm, MonthlyBillForm, RecordPaymentForm,
+    LandlordRegistrationForm, LandlordProfileForm
+)
 from .pdf_utils import render_to_pdf
 
 
 # ==========================================
-# 1. LANDLORD AUTHENTICATION
+# 1. LANDLORD AUTHENTICATION & PROFILE
 # ==========================================
 
 def landlord_register_view(request):
@@ -61,8 +67,32 @@ def landlord_logout_view(request):
     return redirect('login')
 
 
+@login_required
+def profile_settings_view(request):
+    profile, _ = LandlordProfile.objects.get_or_create(user=request.user)
+    if request.method == 'POST':
+        form = LandlordProfileForm(request.POST, instance=profile)
+        if form.is_valid():
+            p = form.save()
+            user = request.user
+            user.first_name = form.cleaned_data.get('first_name', user.first_name)
+            user.last_name = form.cleaned_data.get('last_name', user.last_name)
+            user.email = form.cleaned_data.get('email', user.email)
+            user.save()
+            messages.success(request, "Profile settings aur UPI details successfully update ho gayi! ✨")
+            return redirect('profile_settings')
+    else:
+        initial = {
+            'first_name': request.user.first_name,
+            'last_name': request.user.last_name,
+            'email': request.user.email,
+        }
+        form = LandlordProfileForm(instance=profile, initial=initial)
+    return render(request, 'settings/profile.html', {'form': form, 'profile': profile})
+
+
 # ==========================================
-# 2. DASHBOARD VIEW (TOP SUMMARY & STATS)
+# 2. DASHBOARD VIEW (TOP SUMMARY & METRICS)
 # ==========================================
 
 @login_required
@@ -74,29 +104,30 @@ def dashboard_view(request):
     occupied_rooms = rooms.filter(is_occupied=True).count()
     vacant_rooms = total_rooms - occupied_rooms
 
-    # Current month string
-    current_month_str = timezone.now().strftime("%B %Y")
-    
     # Financial metrics
     bills = MonthlyBill.objects.filter(room__landlord=user)
     
-    # Total collected this month (or total collected all-time if empty this month)
+    # Total collected this month
     collected_month = bills.filter(
-        payment_status='PAID',
         billing_month__icontains=timezone.now().strftime("%B")
-    ).aggregate(total=Sum('total_bill'))['total'] or Decimal('0.00')
+    ).aggregate(total=Sum('paid_amount'))['total'] or Decimal('0.00')
 
-    # Total pending rent
-    total_pending = bills.filter(payment_status='PENDING').aggregate(total=Sum('total_bill'))['total'] or Decimal('0.00')
+    # Total pending / balance dues across all unpaid/partial bills
+    total_pending = bills.aggregate(total=Sum('balance_amount'))['total'] or Decimal('0.00')
 
-    # Total collected all-time
-    total_collected_lifetime = bills.filter(payment_status='PAID').aggregate(total=Sum('total_bill'))['total'] or Decimal('0.00')
+    # Lifetime collected rent
+    total_collected_lifetime = bills.aggregate(total=Sum('paid_amount'))['total'] or Decimal('0.00')
+
+    # Security deposits held in trust
+    total_deposits = Tenant.objects.filter(landlord=user, is_active=True).aggregate(
+        total=Sum('security_deposit')
+    )['total'] or Decimal('0.00')
 
     # Recent bills
     recent_bills = bills.select_related('room', 'tenant').order_by('-created_at')[:8]
 
     # Active tenants count
-    active_tenants_count = Tenant.objects.filter(room__landlord=user, is_active=True).count()
+    active_tenants_count = Tenant.objects.filter(landlord=user, is_active=True).count()
 
     context = {
         'total_rooms': total_rooms,
@@ -105,10 +136,12 @@ def dashboard_view(request):
         'collected_month': collected_month,
         'total_pending': total_pending,
         'total_collected_lifetime': total_collected_lifetime,
-        'current_month_str': current_month_str,
+        'total_deposits': total_deposits,
+        'current_month_str': timezone.now().strftime("%B %Y"),
         'recent_bills': recent_bills,
         'rooms': rooms,
         'active_tenants_count': active_tenants_count,
+        'profile': getattr(user, 'profile', None),
     }
     return render(request, 'dashboard.html', context)
 
@@ -194,8 +227,28 @@ def room_delete_view(request, pk):
 
 @login_required
 def tenant_list_view(request):
-    tenants = Tenant.objects.filter(room__landlord=request.user).select_related('room')
-    return render(request, 'tenant_list.html', {'tenants': tenants})
+    search_query = request.GET.get('q', '').strip()
+    status_filter = request.GET.get('status', 'active')
+    
+    tenants = Tenant.objects.filter(landlord=request.user).select_related('room')
+    
+    if status_filter == 'active':
+        tenants = tenants.filter(is_active=True)
+    elif status_filter == 'vacated':
+        tenants = tenants.filter(is_active=False)
+
+    if search_query:
+        tenants = tenants.filter(
+            Q(full_name__icontains=search_query) |
+            Q(mobile_number__icontains=search_query) |
+            Q(room__room_number__icontains=search_query)
+        )
+
+    return render(request, 'tenant_list.html', {
+        'tenants': tenants,
+        'search_query': search_query,
+        'status_filter': status_filter,
+    })
 
 
 @login_required
@@ -208,8 +261,10 @@ def tenant_create_view(request):
     if request.method == 'POST':
         form = TenantForm(request.POST, request.FILES, landlord=request.user)
         if form.is_valid():
-            tenant = form.save()
-            messages.success(request, f"Tenant {tenant.full_name} onboard ho gaye! Document Vault me documents secure hain. 📂")
+            tenant = form.save(commit=False)
+            tenant.landlord = request.user
+            tenant.save()
+            messages.success(request, f"Tenant {tenant.full_name} onboard ho gaye! Documents Vault me secure hain. 📂")
             if tenant.room:
                 return redirect('room_detail', pk=tenant.room.pk)
             return redirect('tenant_detail', pk=tenant.pk)
@@ -220,7 +275,7 @@ def tenant_create_view(request):
 
 @login_required
 def tenant_detail_view(request, pk):
-    tenant = get_object_or_404(Tenant, pk=pk, room__landlord=request.user)
+    tenant = get_object_or_404(Tenant, pk=pk, landlord=request.user)
     bills = tenant.bills.order_by('-created_at')
     return render(request, 'tenant_detail.html', {
         'tenant': tenant,
@@ -230,7 +285,7 @@ def tenant_detail_view(request, pk):
 
 @login_required
 def tenant_update_view(request, pk):
-    tenant = get_object_or_404(Tenant, pk=pk, room__landlord=request.user)
+    tenant = get_object_or_404(Tenant, pk=pk, landlord=request.user)
     if request.method == 'POST':
         form = TenantForm(request.POST, request.FILES, instance=tenant, landlord=request.user)
         if form.is_valid():
@@ -244,10 +299,12 @@ def tenant_update_view(request, pk):
 
 @login_required
 def tenant_vacate_view(request, pk):
-    tenant = get_object_or_404(Tenant, pk=pk, room__landlord=request.user)
+    tenant = get_object_or_404(Tenant, pk=pk, landlord=request.user)
     if request.method == 'POST':
         tenant.is_active = False
+        tenant.move_out_date = timezone.now().date()
         old_room = tenant.room
+        tenant.room = None  # Free the room
         tenant.save()
         if old_room:
             old_room.sync_occupancy_status()
@@ -257,7 +314,46 @@ def tenant_vacate_view(request, pk):
 
 
 # ==========================================
-# 5. MODULE 3 & 4: MONTHLY BILL GENERATOR & LEDGER
+# 5. SECURITY: SECURE DOCUMENT VAULT STREAMING
+# ==========================================
+
+@login_required
+def secure_aadhaar_view(request, tenant_id):
+    """
+    CRITICAL SECURITY VIEW:
+    Restricts access to Aadhaar documents strictly to the authorized Landlord.
+    Unauthorized users receive a 403 Forbidden.
+    """
+    tenant = get_object_or_404(Tenant, pk=tenant_id)
+    if tenant.landlord != request.user:
+        return HttpResponseForbidden("Security Violation: You do not have permission to access this tenant's KYC document.")
+
+    if not tenant.aadhaar_document or not os.path.exists(tenant.aadhaar_document.path):
+        raise Http404("Aadhaar document file not found.")
+
+    mime_type, _ = mimetypes.guess_type(tenant.aadhaar_document.path)
+    return FileResponse(open(tenant.aadhaar_document.path, 'rb'), content_type=mime_type or 'application/octet-stream')
+
+
+@login_required
+def secure_agreement_view(request, tenant_id):
+    """
+    CRITICAL SECURITY VIEW:
+    Restricts access to Rent Agreements strictly to the authorized Landlord.
+    """
+    tenant = get_object_or_404(Tenant, pk=tenant_id)
+    if tenant.landlord != request.user:
+        return HttpResponseForbidden("Security Violation: You do not have permission to access this rent agreement.")
+
+    if not tenant.agreement_document or not os.path.exists(tenant.agreement_document.path):
+        raise Http404("Rent agreement file not found.")
+
+    mime_type, _ = mimetypes.guess_type(tenant.agreement_document.path)
+    return FileResponse(open(tenant.agreement_document.path, 'rb'), content_type=mime_type or 'application/octet-stream')
+
+
+# ==========================================
+# 6. MODULE 3 & 4: MONTHLY BILL GENERATOR & LEDGER
 # ==========================================
 
 @login_required
@@ -266,13 +362,13 @@ def bill_list_view(request):
     month_filter = request.GET.get('month', '')
     bills = MonthlyBill.objects.filter(room__landlord=request.user).select_related('room', 'tenant')
 
-    if status_filter in ['PENDING', 'PAID']:
+    if status_filter in ['PENDING', 'PARTIAL', 'PAID']:
         bills = bills.filter(payment_status=status_filter)
     if month_filter:
         bills = bills.filter(billing_month__icontains=month_filter)
 
-    total_pending = MonthlyBill.objects.filter(room__landlord=request.user, payment_status='PENDING').aggregate(total=Sum('total_bill'))['total'] or Decimal('0.00')
-    total_paid = MonthlyBill.objects.filter(room__landlord=request.user, payment_status='PAID').aggregate(total=Sum('total_bill'))['total'] or Decimal('0.00')
+    total_pending = MonthlyBill.objects.filter(room__landlord=request.user).aggregate(total=Sum('balance_amount'))['total'] or Decimal('0.00')
+    total_paid = MonthlyBill.objects.filter(room__landlord=request.user).aggregate(total=Sum('paid_amount'))['total'] or Decimal('0.00')
 
     return render(request, 'bill_list.html', {
         'bills': bills,
@@ -287,12 +383,7 @@ def bill_list_view(request):
 def get_room_bill_details(request, room_id):
     """
     HTMX/AJAX Endpoint:
-    Returns prefill data when landlord selects a room in bill generator:
-    - Base Rent
-    - Default Maintenance
-    - Previous Meter Reading
-    - Electricity Rate per unit
-    - Active Tenant ID and Name
+    Returns prefill data when landlord selects a room in bill generator.
     """
     try:
         room = Room.objects.get(pk=room_id, landlord=request.user)
@@ -337,7 +428,7 @@ def bill_create_view(request):
             pass
 
     if request.method == 'POST':
-        form = MonthlyBillForm(request.POST, landlord=request.user)
+        form = MonthlyBillForm(request.POST, request.FILES, landlord=request.user)
         if form.is_valid():
             bill = form.save()
             messages.success(request, f"Bill #{bill.receipt_number} generate ho gaya! Total: ₹{bill.total_bill}. WhatsApp link ready hai. ⚡")
@@ -357,26 +448,54 @@ def bill_create_view(request):
 @login_required
 def bill_detail_view(request, pk):
     bill = get_object_or_404(MonthlyBill, pk=pk, room__landlord=request.user)
-    return render(request, 'bill_detail.html', {'bill': bill})
+    payment_form = RecordPaymentForm(instance=bill)
+    return render(request, 'bill_detail.html', {
+        'bill': bill,
+        'payment_form': payment_form,
+    })
+
+
+@login_required
+def bill_record_payment_view(request, pk):
+    """
+    Records a payment (Partial or Full) on an existing bill.
+    Supports HTMX updates or standard redirect.
+    """
+    bill = get_object_or_404(MonthlyBill, pk=pk, room__landlord=request.user)
+    if request.method == 'POST':
+        amount = request.POST.get('paid_amount')
+        method = request.POST.get('payment_method', 'UPI')
+        reference = request.POST.get('payment_reference', '')
+        
+        try:
+            bill.paid_amount = Decimal(str(amount))
+            bill.payment_method = method
+            bill.payment_reference = reference
+            bill.save()
+            messages.success(request, f"Payment recorded! Paid: ₹{bill.paid_amount}, Balance: ₹{bill.balance_amount}. Status: {bill.get_payment_status_display()}")
+        except Exception as e:
+            messages.error(request, f"Payment recording failed: {e}")
+
+    return redirect('bill_detail', pk=bill.pk)
 
 
 @login_required
 def bill_toggle_status_view(request, pk):
     """
-    HTMX 1-Click Status Toggle:
-    Flips status between PENDING and PAID.
-    Returns the partial HTML button/badge without page reload!
+    HTMX 1-Click Quick Toggle:
+    Flips between PENDING (₹0 paid) and PAID (100% cleared).
     """
     bill = get_object_or_404(MonthlyBill, pk=pk, room__landlord=request.user)
-    if bill.payment_status == 'PENDING':
+    if bill.payment_status in ['PENDING', 'PARTIAL']:
+        bill.paid_amount = bill.total_bill
         bill.payment_status = 'PAID'
         bill.paid_on = timezone.now()
     else:
+        bill.paid_amount = Decimal('0.00')
         bill.payment_status = 'PENDING'
         bill.paid_on = None
     bill.save()
 
-    # If request is HTMX, return status badge partial
     if request.headers.get('HX-Request'):
         return render(request, 'partials/bill_status_badge.html', {'bill': bill})
     
@@ -387,13 +506,13 @@ def bill_toggle_status_view(request, pk):
 @login_required
 def bill_receipt_pdf_view(request, pk):
     """
-    Digital PDF Receipt Generation:
-    Uses xhtml2pdf to render a download-ready digital rent receipt.
+    Generates downloadable digital PDF rent receipt with Landlord Profile & UPI details.
     """
     bill = get_object_or_404(MonthlyBill, pk=pk, room__landlord=request.user)
     context = {
         'bill': bill,
         'landlord': request.user,
+        'profile': getattr(request.user, 'profile', None),
         'generated_at': timezone.now(),
     }
     pdf = render_to_pdf('receipt_pdf.html', context)
@@ -414,3 +533,50 @@ def bill_delete_view(request, pk):
         messages.success(request, f"Bill #{receipt_num} delete kar diya gaya.")
         return redirect('bill_list')
     return render(request, 'confirm_delete.html', {'object': bill, 'type': 'Bill'})
+
+
+@login_required
+def bill_export_csv_view(request):
+    """
+    Exports the entire landlord billing ledger to a formatted CSV file.
+    Ready for accounting / Excel tax filing.
+    """
+    bills = MonthlyBill.objects.filter(room__landlord=request.user).select_related('room', 'tenant').order_by('-created_at')
+    
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="SmartRent_Ledger_{timezone.now().strftime("%Y%m%d")}.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow([
+        'Receipt No', 'Month', 'Room', 'Property Type', 'Tenant Name', 'Mobile',
+        'Prev Meter (kWh)', 'Curr Meter (kWh)', 'Units Consumed', 'Rate/Unit (INR)',
+        'Electricity Bill (INR)', 'Base Rent (INR)', 'Maintenance (INR)', 'Total Bill (INR)',
+        'Paid Amount (INR)', 'Balance Due (INR)', 'Payment Status', 'Payment Method', 'Payment Ref', 'Due Date', 'Paid Date'
+    ])
+    
+    for b in bills:
+        writer.writerow([
+            b.receipt_number,
+            b.billing_month,
+            b.room.room_number,
+            b.room.get_property_type_display(),
+            b.tenant.full_name,
+            b.tenant.mobile_number,
+            b.previous_reading,
+            b.current_reading,
+            b.units_consumed,
+            b.rate_per_unit,
+            b.electricity_bill,
+            b.rent_amount,
+            b.maintenance_amount,
+            b.total_bill,
+            b.paid_amount,
+            b.balance_amount,
+            b.get_payment_status_display(),
+            b.get_payment_method_display(),
+            b.payment_reference,
+            b.due_date.strftime("%Y-%m-%d"),
+            b.paid_on.strftime("%Y-%m-%d %H:%M") if b.paid_on else ''
+        ])
+        
+    return response

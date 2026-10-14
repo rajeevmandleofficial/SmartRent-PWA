@@ -13,6 +13,7 @@
         ratePerUnit: parseFloat('{{ form.rate_per_unit.value|default:8 }}') || 8,
         rentAmount: parseFloat('{{ form.rent_amount.value|default:0 }}') || 0,
         maintAmount: parseFloat('{{ form.maintenance_amount.value|default:0 }}') || 0,
+        paidAmount: parseFloat('{{ form.paid_amount.value|default:0 }}') || 0,
         loading: false,
 
         get unitsConsumed() {
@@ -27,6 +28,11 @@
             let m = isNaN(this.maintAmount) ? 0 : this.maintAmount;
             let e = isNaN(this.electricityBill) ? 0 : this.electricityBill;
             return parseFloat((r + m + e).toFixed(2));
+        },
+        get balanceDue() {
+            let p = isNaN(this.paidAmount) ? 0 : this.paidAmount;
+            let bal = this.totalBill - p;
+            return bal > 0 ? parseFloat(bal.toFixed(2)) : 0;
         },
         get isReadingInvalid() {
             return this.currReading > 0 && this.currReading < this.prevReading;
@@ -45,7 +51,6 @@
                     this.maintAmount = data.default_maintenance;
                     this.tenantName = data.tenant_name;
                     
-                    // Update input fields
                     document.getElementById('id_prev_reading').value = this.prevReading;
                     document.getElementById('id_rate_unit').value = this.ratePerUnit;
                     document.getElementById('id_rent_amt').value = this.rentAmount;
@@ -77,16 +82,16 @@
                 1-Click Monthly Auto-Bill Generator
             </h1>
             <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-                Room select karo, app rent aur pichla meter auto-fill karegi. Bas current reading dalo aur instant preview dekho!
+                Room select karein, rent aur sub-meter readings auto-fill ho jayengi. Bas current reading enter karein!
             </p>
         </div>
     </div>
 
     <!-- Main Grid: Form Left, Real-Time Calculator Preview Right -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         <!-- Left: Bill Form (7 cols) -->
         <div class="lg:col-span-7 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-5">
-            <form method="post" class="space-y-4" id="billForm">
+            <form method="post" enctype="multipart/form-data" class="space-y-4" id="billForm">
                 {% csrf_token %}
 
                 {% if form.non_field_errors %}
@@ -117,9 +122,6 @@
                             <i class="fa-solid fa-spinner"></i>
                         </span>
                     </div>
-                    {% if form.room.errors %}
-                    <p class="text-xs text-rose-500 mt-1">{{ form.room.errors.0 }}</p>
-                    {% endif %}
                 </div>
 
                 <!-- Tenant Selection -->
@@ -136,9 +138,6 @@
                         </option>
                         {% endfor %}
                     </select>
-                    {% if form.tenant.errors %}
-                    <p class="text-xs text-rose-500 mt-1">{{ form.tenant.errors.0 }}</p>
-                    {% endif %}
                 </div>
 
                 <!-- Billing Month & Due Date -->
@@ -148,22 +147,16 @@
                             Billing Month
                         </label>
                         {{ form.billing_month }}
-                        {% if form.billing_month.errors %}
-                        <p class="text-xs text-rose-500 mt-1">{{ form.billing_month.errors.0 }}</p>
-                        {% endif %}
                     </div>
                     <div>
                         <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
                             Due Date
                         </label>
                         {{ form.due_date }}
-                        {% if form.due_date.errors %}
-                        <p class="text-xs text-rose-500 mt-1">{{ form.due_date.errors.0 }}</p>
-                        {% endif %}
                     </div>
                 </div>
 
-                <!-- Sub-Meter Readings (Auto-Prefill + Landlord Input) -->
+                <!-- Sub-Meter Readings -->
                 <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-4">
                     <div class="flex items-center justify-between">
                         <span class="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
@@ -212,6 +205,15 @@
                         <i class="fa-solid fa-triangle-exclamation text-rose-600"></i>
                         <span>Current reading previous reading se kam nahi ho sakti!</span>
                     </div>
+
+                    <!-- Sub-meter Photo Proof Upload -->
+                    <div class="pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                        <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                            <i class="fa-solid fa-camera text-indigo-500 mr-1"></i> Sub-Meter Photo Proof (Optional Mobile Snap)
+                        </label>
+                        {{ form.meter_photo }}
+                        <span class="text-[10px] text-slate-400">Tenant ke sath future disputes avoid karne ke liye camera snap upload karein.</span>
+                    </div>
                 </div>
 
                 <!-- Rent & Maintenance Amounts -->
@@ -235,12 +237,29 @@
                     </div>
                 </div>
 
-                <!-- Payment Status Initial Choice -->
-                <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
-                        Payment Status
-                    </label>
-                    {{ form.payment_status }}
+                <!-- Optional Upfront Payment -->
+                <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                        <i class="fa-solid fa-receipt"></i>
+                        Upfront Payment (If Already Paid)
+                    </span>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-500 mb-1">Paid Amount (₹)</label>
+                            <input type="number" step="0.01" name="paid_amount" id="id_paid_amt"
+                                   x-model.number="paidAmount"
+                                   placeholder="0.00"
+                                   class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-500 mb-1">Payment Method</label>
+                            {{ form.payment_method }}
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-500 mb-1">Payment Ref / UTR</label>
+                            {{ form.payment_reference }}
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Action Button -->
@@ -249,7 +268,7 @@
                             :disabled="isReadingInvalid || !roomId"
                             class="w-full py-3.5 px-4 rounded-xl font-extrabold text-sm text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 shadow-md shadow-brand-500/25 active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                         <i class="fa-solid fa-check"></i>
-                        <span>Generate & Save Bill</span>
+                        <span>Generate &amp; Save Bill</span>
                     </button>
                 </div>
             </form>
@@ -318,21 +337,24 @@
                     </div>
                 </div>
 
-                <!-- Grand Total Display -->
-                <div class="pt-4 border-t border-indigo-800/80">
+                <!-- Grand Total & Balance Display -->
+                <div class="pt-4 border-t border-indigo-800/80 space-y-2">
                     <div class="p-4 rounded-xl bg-gradient-to-r from-emerald-600/30 to-teal-500/20 border border-emerald-500/40 text-center">
                         <p class="text-[11px] uppercase tracking-wider font-extrabold text-emerald-300">Total Monthly Bill</p>
                         <p class="text-3xl font-extrabold text-white mt-1 font-mono tracking-tight" x-text="'₹' + totalBill">
                             ₹0.00
                         </p>
-                        <p class="text-[10px] text-emerald-300/80 mt-1">Rent + Electricity + Maintenance</p>
+                        <div class="mt-2 pt-2 border-t border-emerald-500/30 flex justify-between text-xs text-emerald-200 font-mono">
+                            <span>Paid: ₹<span x-text="paidAmount || 0">0</span></span>
+                            <span class="font-bold text-amber-300">Due Balance: ₹<span x-text="balanceDue">0</span></span>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Auto-Update Meter Notice -->
                 <div class="p-3 rounded-xl bg-indigo-900/40 border border-indigo-800/40 text-[11px] text-indigo-300 flex items-start gap-2">
                     <i class="fa-solid fa-circle-info text-indigo-400 mt-0.5"></i>
-                    <span>Bill generate hote hi Room ka Current Meter Reading automatically update ho jayega agle mahine ke liye!</span>
+                    <span>Bill save hote hi Room ka Current Meter Reading automatically update ho jayega agle mahine ke liye!</span>
                 </div>
             </div>
         </div>

@@ -26,7 +26,7 @@
             padding-bottom: 15px;
         }
         .brand-title {
-            font-size: 24pt;
+            font-size: 22pt;
             font-weight: bold;
             color: #4f46e5;
             margin: 0;
@@ -119,12 +119,18 @@
             font-size: 9.5pt;
         }
         .charges-table .total-row td {
-            font-size: 13pt;
+            font-size: 12pt;
             font-weight: bold;
             color: #0f172a;
             border-top: 2px solid #0f172a;
-            border-bottom: 2px solid #0f172a;
             background-color: #f8fafc;
+        }
+        .charges-table .balance-row td {
+            font-size: 12pt;
+            font-weight: bold;
+            color: #b91c1c;
+            border-bottom: 2px solid #0f172a;
+            background-color: #fef2f2;
         }
         .status-box {
             padding: 10px;
@@ -136,6 +142,11 @@
             background-color: #dcfce7;
             border: 2px solid #16a34a;
             color: #15803d;
+        }
+        .status-partial {
+            background-color: #e0f2fe;
+            border: 2px solid #0284c7;
+            color: #0369a1;
         }
         .status-pending {
             background-color: #fef3c7;
@@ -166,10 +177,12 @@
     <table class="header-table">
         <tr>
             <td style="width: 55%; vertical-align: top;">
-                <div class="brand-title">SmartRent</div>
+                <div class="brand-title">{{ profile.business_name|default:"SmartRent" }}</div>
                 <div class="brand-subtitle">Property &amp; Tenant Management System</div>
                 <div style="margin-top: 6px; font-size: 8.5pt; color: #475569;">
                     Landlord: <b>{{ landlord.get_full_name|default:landlord.username }}</b><br>
+                    {% if profile.upi_id %}UPI ID: <b>{{ profile.upi_id }}</b><br>{% endif %}
+                    {% if profile.phone_number %}Phone: <b>{{ profile.phone_number }}</b><br>{% endif %}
                     Generated: {{ generated_at|date:"d M Y, h:i A" }}
                 </div>
             </td>
@@ -200,7 +213,7 @@
                 <div class="info-card">
                     <div class="info-title">Property / Room Details</div>
                     <div class="info-name">Room {{ bill.room.room_number }}</div>
-                    <div class="info-detail">Type: {{ bill.room.get_property_type_display }}</div>
+                    <div class="info-detail">Floor / Type: {{ bill.room.floor }} ({{ bill.room.get_property_type_display }})</div>
                     <div class="info-detail">Billing Cycle: Due on {{ bill.room.billing_day }}th of month</div>
                 </div>
             </td>
@@ -268,8 +281,20 @@
                 <td style="text-align: right;">Rs. {{ bill.maintenance_amount }}</td>
             </tr>
             <tr class="total-row">
-                <td colspan="2" style="text-align: right; padding-right: 15px;">GRAND TOTAL:</td>
+                <td colspan="2" style="text-align: right; padding-right: 15px;">TOTAL AMOUNT BILLED:</td>
                 <td style="text-align: right; color: #4f46e5;">Rs. {{ bill.total_bill }}</td>
+            </tr>
+            <tr>
+                <td colspan="2" style="text-align: right; padding-right: 15px; color: #15803d; font-weight: bold;">
+                    AMOUNT RECEIVED (PAID):
+                </td>
+                <td style="text-align: right; color: #15803d; font-weight: bold;">
+                    - Rs. {{ bill.paid_amount }}
+                </td>
+            </tr>
+            <tr class="balance-row">
+                <td colspan="2" style="text-align: right; padding-right: 15px;">REMAINING BALANCE DUE:</td>
+                <td style="text-align: right;">Rs. {{ bill.balance_amount }}</td>
             </tr>
         </tbody>
     </table>
@@ -282,6 +307,15 @@
         </span>
         <div style="font-size: 8.5pt; margin-top: 3px;">
             Received on: <b>{{ bill.paid_on|date:"d M Y, h:i A" }}</b> | Receipt No: <b>{{ bill.receipt_number }}</b>
+        </div>
+    </div>
+    {% elif bill.payment_status == 'PARTIAL' %}
+    <div class="status-box status-partial">
+        <span style="font-size: 13pt; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">
+            [PARTIAL PAYMENT] RS. {{ bill.paid_amount }} RECEIVED
+        </span>
+        <div style="font-size: 8.5pt; margin-top: 3px;">
+            Remaining Balance Due: <b>Rs. {{ bill.balance_amount }}</b> | Due Date: <b>{{ bill.due_date|date:"d M, Y" }}</b>
         </div>
     </div>
     {% else %}

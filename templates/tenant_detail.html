@@ -3,7 +3,7 @@
 {% block title %}{{ tenant.full_name }} | Document Vault & Profile{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto space-y-6" x-data="{ previewModal: false, previewUrl: '', previewTitle: '', isPdf: false }">
+<div class="max-w-4xl mx-auto space-y-6" x-data="{ previewModal: false, previewSrc: '', previewType: '', previewTitle: '' }">
     <!-- Top Bar -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -11,7 +11,7 @@
                 <i class="fa-solid fa-arrow-left"></i>
                 <span>Back to Tenants</span>
             </a>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 flex-wrap">
                 <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
                     {{ tenant.full_name }}
                 </h1>
@@ -22,7 +22,7 @@
                 </span>
                 {% else %}
                 <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-                    Vacated
+                    Vacated on {{ tenant.move_out_date|default:"Past" }}
                 </span>
                 {% endif %}
             </div>
@@ -59,20 +59,20 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <!-- Assigned Room -->
         <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-2">
-            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Assigned Room / Flat</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Assigned Flat/Room</span>
             {% if tenant.room %}
             <div>
                 <a href="{% url 'room_detail' tenant.room.pk %}" class="text-xl font-extrabold text-brand-600 dark:text-brand-400 hover:underline">
                     Room {{ tenant.room.room_number }}
                 </a>
-                <p class="text-xs text-slate-500">{{ tenant.room.get_property_type_display }}</p>
+                <p class="text-xs text-slate-500">{{ tenant.room.floor }} • {{ tenant.room.get_property_type_display }}</p>
             </div>
             <div class="pt-2 border-t border-slate-100 dark:border-slate-800 text-xs flex justify-between">
                 <span class="text-slate-400">Monthly Rent:</span>
                 <span class="font-bold text-slate-800 dark:text-white">₹{{ tenant.room.base_rent }}</span>
             </div>
             {% else %}
-            <p class="text-sm font-bold text-slate-400 italic">No Room Assigned</p>
+            <p class="text-sm font-bold text-slate-400 italic">No Room Assigned (Vacated)</p>
             {% endif %}
         </div>
 
@@ -89,15 +89,16 @@
             </div>
         </div>
 
-        <!-- Quick Billing Action -->
+        <!-- Security Deposit -->
         <div class="p-5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 shadow-sm flex flex-col justify-between">
             <div>
-                <span class="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">Quick Bill</span>
-                <p class="text-xs text-indigo-900 dark:text-indigo-200 mt-1">
-                    Is tenant ke liye sub-meter reading enter karke turant bill create karein.
+                <span class="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">Security Deposit</span>
+                <p class="text-2xl font-extrabold font-mono text-indigo-950 dark:text-white mt-1">₹{{ tenant.security_deposit }}</p>
+                <p class="text-xs text-indigo-700/80 dark:text-indigo-300 mt-0.5">
+                    {% if tenant.deposit_refunded %}Refunded to tenant{% else %}Held securely in trust{% endif %}
                 </p>
             </div>
-            {% if tenant.room %}
+            {% if tenant.room and tenant.is_active %}
             <a href="{% url 'bill_create' %}?room={{ tenant.room.id }}" class="mt-3 w-full py-2 px-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold text-center shadow-sm">
                 <i class="fa-solid fa-bolt mr-1"></i> Generate Bill
             </a>
@@ -105,7 +106,7 @@
         </div>
     </div>
 
-    <!-- 1-Click Document Vault Section -->
+    <!-- 1-Click Document Vault Section (SECURE STREAMING PROTECTED) -->
     <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm p-6 space-y-5">
         <div class="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800 pb-4">
             <div class="flex items-center gap-3">
@@ -113,11 +114,16 @@
                     <i class="fa-solid fa-vault"></i>
                 </div>
                 <div>
-                    <h2 class="text-lg font-extrabold text-slate-900 dark:text-white">
-                        1-Click Document Vault
-                    </h2>
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-lg font-extrabold text-slate-900 dark:text-white">
+                            1-Click Secure Document Vault
+                        </h2>
+                        <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                            🔒 Access-Controlled
+                        </span>
+                    </div>
                     <p class="text-xs text-slate-500 dark:text-slate-400">
-                        Securely preview and download uploaded KYC Aadhaar cards and Rent Agreements.
+                        Documents are securely authenticated and protected from unauthorized public access.
                     </p>
                 </div>
             </div>
@@ -132,7 +138,7 @@
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <i class="fa-solid fa-id-card text-brand-600 text-lg"></i>
-                        <h3 class="font-extrabold text-sm text-slate-900 dark:text-white">Aadhaar Card</h3>
+                        <h3 class="font-extrabold text-sm text-slate-900 dark:text-white">Aadhaar Card Document</h3>
                     </div>
                     {% if tenant.aadhaar_document %}
                     <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
@@ -151,19 +157,22 @@
                 </p>
 
                 <div class="flex items-center gap-2 pt-2">
-                    <a href="{{ tenant.aadhaar_document.url }}" target="_blank"
-                       class="flex-1 text-center py-2 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold hover:border-brand-500 transition-colors shadow-sm">
-                        <i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> Preview / View
-                    </a>
-                    <a href="{{ tenant.aadhaar_document.url }}" download
+                    <!-- Secure Preview Button -->
+                    <button type="button"
+                            @click="previewModal = true; previewSrc = '{% url 'secure_aadhaar' tenant.pk %}'; previewTitle = 'Aadhaar Card - {{ tenant.full_name }}'; previewType = '{{ tenant.aadhaar_document.name|slice:'-4:' }}'"
+                            class="flex-1 py-2 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold hover:border-brand-500 transition-colors shadow-sm">
+                        <i class="fa-solid fa-eye mr-1 text-brand-500"></i> View in App
+                    </button>
+                    <!-- Secure Direct Link -->
+                    <a href="{% url 'secure_aadhaar' tenant.pk %}" target="_blank"
                        class="py-2 px-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold shadow-sm transition-colors"
-                       title="Download Aadhaar">
-                        <i class="fa-solid fa-download"></i>
+                       title="Open Secure File in New Tab">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
                     </a>
                 </div>
                 {% else %}
                 <p class="text-xs text-slate-400 italic">
-                    Aadhaar card scan ya image upload nahi kiya gaya hai.
+                    Aadhaar card scan upload nahi kiya gaya hai.
                 </p>
                 <a href="{% url 'tenant_update' tenant.pk %}" class="inline-block text-xs font-bold text-brand-600 hover:underline pt-1">
                     + Upload Aadhaar Document
@@ -176,7 +185,7 @@
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <i class="fa-solid fa-file-contract text-emerald-600 text-lg"></i>
-                        <h3 class="font-extrabold text-sm text-slate-900 dark:text-white">Rent Agreement</h3>
+                        <h3 class="font-extrabold text-sm text-slate-900 dark:text-white">Rent Agreement (11-Month)</h3>
                     </div>
                     {% if tenant.agreement_document %}
                     <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
@@ -195,14 +204,15 @@
                 </p>
 
                 <div class="flex items-center gap-2 pt-2">
-                    <a href="{{ tenant.agreement_document.url }}" target="_blank"
-                       class="flex-1 text-center py-2 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold hover:border-emerald-500 transition-colors shadow-sm">
-                        <i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> Preview / View
-                    </a>
-                    <a href="{{ tenant.agreement_document.url }}" download
+                    <button type="button"
+                            @click="previewModal = true; previewSrc = '{% url 'secure_agreement' tenant.pk %}'; previewTitle = 'Rent Agreement - {{ tenant.full_name }}'; previewType = '{{ tenant.agreement_document.name|slice:'-4:' }}'"
+                            class="flex-1 py-2 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold hover:border-emerald-500 transition-colors shadow-sm">
+                        <i class="fa-solid fa-eye mr-1 text-emerald-500"></i> View in App
+                    </button>
+                    <a href="{% url 'secure_agreement' tenant.pk %}" target="_blank"
                        class="py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-sm transition-colors"
-                       title="Download Agreement">
-                        <i class="fa-solid fa-download"></i>
+                       title="Open Secure Agreement in New Tab">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
                     </a>
                 </div>
                 {% else %}
@@ -222,7 +232,7 @@
         <div class="p-5 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
             <h2 class="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
                 <i class="fa-solid fa-receipt text-brand-600"></i>
-                <span>Tenant Monthly Bills & Receipts ({{ bills.count }})</span>
+                <span>Tenant Monthly Bills Ledger ({{ bills.count }})</span>
             </h2>
         </div>
 
@@ -232,9 +242,9 @@
                 <thead class="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 text-xs uppercase font-bold tracking-wider border-b border-slate-200 dark:border-slate-800">
                     <tr>
                         <th class="px-4 py-3">Receipt / Month</th>
-                        <th class="px-4 py-3">⚡ Sub-Meter Units</th>
+                        <th class="px-4 py-3">⚡ Sub-Meter</th>
                         <th class="px-4 py-3">Total Amount</th>
-                        <th class="px-4 py-3">Due Date</th>
+                        <th class="px-4 py-3">Balance Due</th>
                         <th class="px-4 py-3 text-center">Status</th>
                         <th class="px-4 py-3 text-right">Actions</th>
                     </tr>
@@ -257,8 +267,8 @@
                         <td class="px-4 py-3 font-extrabold text-slate-900 dark:text-white">
                             ₹{{ bill.total_bill }}
                         </td>
-                        <td class="px-4 py-3 text-xs text-slate-500">
-                            {{ bill.due_date|date:"d M, Y" }}
+                        <td class="px-4 py-3 font-bold {% if bill.balance_amount > 0 %}text-rose-600 dark:text-rose-400{% else %}text-emerald-600{% endif %}">
+                            ₹{{ bill.balance_amount }}
                         </td>
                         <td class="px-4 py-3 text-center whitespace-nowrap">
                             {% include 'partials/bill_status_badge.html' with bill=bill %}
@@ -281,6 +291,30 @@
             Is tenant ke liye abhi tak koi bill generate nahi hua hai.
         </div>
         {% endif %}
+    </div>
+
+    <!-- Interactive In-App Document Preview Modal -->
+    <div x-show="previewModal" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+        <div @click.outside="previewModal = false"
+             class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-4 sm:p-6 max-w-3xl w-full max-h-[90vh] flex flex-col space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                <h3 class="font-extrabold text-base text-slate-900 dark:text-white" x-text="previewTitle">Document Preview</h3>
+                <div class="flex items-center gap-2">
+                    <a :href="previewSrc" target="_blank" class="text-xs text-brand-600 font-bold hover:underline">Open in tab</a>
+                    <button @click="previewModal = false" class="text-slate-400 hover:text-slate-600 text-sm ml-2"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-auto rounded-xl bg-slate-100 dark:bg-slate-950 flex items-center justify-center min-h-[350px]">
+                <template x-if="previewType.toLowerCase() === '.pdf'">
+                    <iframe :src="previewSrc" class="w-full h-[550px] rounded-xl border-0"></iframe>
+                </template>
+                <template x-if="previewType.toLowerCase() !== '.pdf'">
+                    <img :src="previewSrc" alt="KYC Document Preview" class="max-h-[550px] max-w-full object-contain rounded-xl shadow">
+                </template>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}

@@ -1,7 +1,6 @@
 from django import forms
 from django.contrib.auth.models import User
-from django.utils import timezone
-from .models import Room, Tenant, MonthlyBill
+from .models import Room, Tenant, MonthlyBill, LandlordProfile
 from decimal import Decimal
 
 
@@ -14,15 +13,17 @@ class RoomForm(forms.ModelForm):
     class Meta:
         model = Room
         fields = [
-            'room_number', 'property_type', 'base_rent',
-            'default_maintenance', 'electricity_rate_per_unit',
+            'room_number', 'floor', 'property_type', 'base_rent',
+            'default_maintenance', 'security_deposit', 'electricity_rate_per_unit',
             'current_meter_reading', 'billing_day'
         ]
         widgets = {
             'room_number': forms.TextInput(attrs={'class': TAILWIND_INPUT, 'placeholder': 'e.g. 101, F-2, B-402'}),
+            'floor': forms.TextInput(attrs={'class': TAILWIND_INPUT, 'placeholder': 'e.g. Ground Floor, 1st Floor'}),
             'property_type': forms.Select(attrs={'class': TAILWIND_SELECT}),
             'base_rent': forms.NumberInput(attrs={'class': TAILWIND_INPUT, 'placeholder': 'e.g. 8500', 'step': '0.01'}),
             'default_maintenance': forms.NumberInput(attrs={'class': TAILWIND_INPUT, 'placeholder': 'e.g. 500', 'step': '0.01'}),
+            'security_deposit': forms.NumberInput(attrs={'class': TAILWIND_INPUT, 'placeholder': 'e.g. 10000', 'step': '0.01'}),
             'electricity_rate_per_unit': forms.NumberInput(attrs={'class': TAILWIND_INPUT, 'placeholder': 'e.g. 8.00', 'step': '0.01'}),
             'current_meter_reading': forms.NumberInput(attrs={'class': TAILWIND_INPUT, 'placeholder': 'e.g. 1420.5', 'step': '0.01'}),
             'billing_day': forms.NumberInput(attrs={'class': TAILWIND_INPUT, 'min': 1, 'max': 31, 'placeholder': '1 to 31'}),
@@ -34,7 +35,7 @@ class TenantForm(forms.ModelForm):
         model = Tenant
         fields = [
             'room', 'full_name', 'mobile_number',
-            'emergency_contact', 'aadhaar_document',
+            'emergency_contact', 'security_deposit', 'aadhaar_document',
             'agreement_document', 'move_in_date', 'is_active'
         ]
         widgets = {
@@ -42,8 +43,9 @@ class TenantForm(forms.ModelForm):
             'full_name': forms.TextInput(attrs={'class': TAILWIND_INPUT, 'placeholder': 'e.g. Rahul Sharma'}),
             'mobile_number': forms.TextInput(attrs={'class': TAILWIND_INPUT, 'placeholder': '10-digit mobile (e.g. 9876543210)'}),
             'emergency_contact': forms.TextInput(attrs={'class': TAILWIND_INPUT, 'placeholder': 'Emergency phone number'}),
-            'aadhaar_document': forms.ClearableFileInput(attrs={'class': TAILWIND_FILE, 'accept': '.pdf,.jpg,.jpeg,.png'}),
-            'agreement_document': forms.ClearableFileInput(attrs={'class': TAILWIND_FILE, 'accept': '.pdf,.jpg,.jpeg,.png'}),
+            'security_deposit': forms.NumberInput(attrs={'class': TAILWIND_INPUT, 'placeholder': 'Deposit amount in ₹', 'step': '0.01'}),
+            'aadhaar_document': forms.ClearableFileInput(attrs={'class': TAILWIND_FILE, 'accept': '.pdf,.jpg,.jpeg,.png,.webp'}),
+            'agreement_document': forms.ClearableFileInput(attrs={'class': TAILWIND_FILE, 'accept': '.pdf,.jpg,.jpeg,.png,.webp'}),
             'move_in_date': forms.DateInput(attrs={'class': TAILWIND_INPUT, 'type': 'date'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500 border-gray-300 dark:border-gray-600 dark:bg-slate-700'}),
         }
@@ -51,8 +53,17 @@ class TenantForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         landlord = kwargs.pop('landlord', None)
         super().__init__(*args, **kwargs)
+        self.landlord = landlord
         if landlord:
             self.fields['room'].queryset = Room.objects.filter(landlord=landlord)
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if self.landlord and not instance.pk:
+            instance.landlord = self.landlord
+        if commit:
+            instance.save()
+        return instance
 
 
 class MonthlyBillForm(forms.ModelForm):
@@ -61,7 +72,8 @@ class MonthlyBillForm(forms.ModelForm):
         fields = [
             'room', 'tenant', 'billing_month', 'due_date',
             'previous_reading', 'current_reading', 'rate_per_unit',
-            'rent_amount', 'maintenance_amount', 'payment_status'
+            'rent_amount', 'maintenance_amount', 'paid_amount',
+            'payment_method', 'payment_reference', 'meter_photo', 'notes'
         ]
         widgets = {
             'room': forms.Select(attrs={'class': TAILWIND_SELECT, 'id': 'id_room_select'}),
@@ -73,7 +85,11 @@ class MonthlyBillForm(forms.ModelForm):
             'rate_per_unit': forms.NumberInput(attrs={'class': TAILWIND_INPUT, 'id': 'id_rate_unit', 'step': '0.01'}),
             'rent_amount': forms.NumberInput(attrs={'class': TAILWIND_INPUT, 'id': 'id_rent_amt', 'step': '0.01'}),
             'maintenance_amount': forms.NumberInput(attrs={'class': TAILWIND_INPUT, 'id': 'id_maint_amt', 'step': '0.01'}),
-            'payment_status': forms.Select(attrs={'class': TAILWIND_SELECT}),
+            'paid_amount': forms.NumberInput(attrs={'class': TAILWIND_INPUT, 'id': 'id_paid_amt', 'step': '0.01', 'placeholder': '0.00'}),
+            'payment_method': forms.Select(attrs={'class': TAILWIND_SELECT}),
+            'payment_reference': forms.TextInput(attrs={'class': TAILWIND_INPUT, 'placeholder': 'UPI UTR / Cheque Ref'}),
+            'meter_photo': forms.ClearableFileInput(attrs={'class': TAILWIND_FILE, 'accept': 'image/*'}),
+            'notes': forms.Textarea(attrs={'class': TAILWIND_INPUT, 'rows': 2, 'placeholder': 'Internal notes (optional)'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -81,7 +97,7 @@ class MonthlyBillForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if landlord:
             self.fields['room'].queryset = Room.objects.filter(landlord=landlord)
-            self.fields['tenant'].queryset = Tenant.objects.filter(room__landlord=landlord, is_active=True)
+            self.fields['tenant'].queryset = Tenant.objects.filter(landlord=landlord, is_active=True)
 
     def clean(self):
         cleaned_data = super().clean()
@@ -92,6 +108,34 @@ class MonthlyBillForm(forms.ModelForm):
             if Decimal(str(curr)) < Decimal(str(prev)):
                 self.add_error('current_reading', f"Current sub-meter reading ({curr}) cannot be lower than previous reading ({prev}).")
         return cleaned_data
+
+
+class RecordPaymentForm(forms.ModelForm):
+    """Quick modal form to record partial or full rent payment."""
+    class Meta:
+        model = MonthlyBill
+        fields = ['paid_amount', 'payment_method', 'payment_reference']
+        widgets = {
+            'paid_amount': forms.NumberInput(attrs={'class': TAILWIND_INPUT, 'placeholder': 'Amount in ₹', 'step': '0.01'}),
+            'payment_method': forms.Select(attrs={'class': TAILWIND_SELECT}),
+            'payment_reference': forms.TextInput(attrs={'class': TAILWIND_INPUT, 'placeholder': 'UPI Ref / UTR / Cheque No.'}),
+        }
+
+
+class LandlordProfileForm(forms.ModelForm):
+    first_name = forms.CharField(max_length=30, required=False, widget=forms.TextInput(attrs={'class': TAILWIND_INPUT}))
+    last_name = forms.CharField(max_length=30, required=False, widget=forms.TextInput(attrs={'class': TAILWIND_INPUT}))
+    email = forms.EmailField(required=False, widget=forms.EmailInput(attrs={'class': TAILWIND_INPUT}))
+
+    class Meta:
+        model = LandlordProfile
+        fields = ['business_name', 'phone_number', 'upi_id', 'address']
+        widgets = {
+            'business_name': forms.TextInput(attrs={'class': TAILWIND_INPUT, 'placeholder': 'e.g. Sunrise Residency, Sharma Niwas'}),
+            'phone_number': forms.TextInput(attrs={'class': TAILWIND_INPUT, 'placeholder': 'e.g. 9876543210'}),
+            'upi_id': forms.TextInput(attrs={'class': TAILWIND_INPUT, 'placeholder': 'e.g. 9876543210@paytm or rajesh@oksbi'}),
+            'address': forms.Textarea(attrs={'class': TAILWIND_INPUT, 'rows': 2, 'placeholder': 'Full property address printed on rent receipts'}),
+        }
 
 
 class LandlordRegistrationForm(forms.ModelForm):
