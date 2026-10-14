@@ -1,0 +1,24 @@
+databases:
+  - name: smartrent-db
+    databaseName: smartrent_db
+    user: smartrent_user
+    plan: free
+
+services:
+  - type: web
+    name: smartrent-pwa
+    env: python
+    plan: free
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn smartrent_core.wsgi:application"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: smartrent-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: "*"

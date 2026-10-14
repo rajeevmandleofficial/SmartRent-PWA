@@ -1,0 +1,24 @@
+# Environments
+venv/
+env/
+ENV/
+.env
+
+# Python Bytecode & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.sqlite3
+
+# Static & Media in Prod
+staticfiles/
+media/tenants/aadhaar/*
+media/tenants/agreements/*
+!media/tenants/aadhaar/.gitkeep
+!media/tenants/agreements/.gitkeep
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

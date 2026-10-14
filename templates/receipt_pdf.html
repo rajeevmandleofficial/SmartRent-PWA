@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Rent Receipt - {{ bill.receipt_number }}</title>
+    <style>
+        @page {
+            size: a4 portrait;
+            margin: 1.5cm;
+            @bottom-right {
+                content: "Page " counter(page) " of " counter(pages);
+                font-size: 8pt;
+                color: #64748b;
+            }
+        }
+        body {
+            font-family: Helvetica, Arial, sans-serif;
+            color: #1e293b;
+            font-size: 10pt;
+            line-height: 1.4;
+        }
+        .header-table {
+            width: 100%;
+            margin-bottom: 25px;
+            border-bottom: 2px solid #4f46e5;
+            padding-bottom: 15px;
+        }
+        .brand-title {
+            font-size: 24pt;
+            font-weight: bold;
+            color: #4f46e5;
+            margin: 0;
+        }
+        .brand-subtitle {
+            font-size: 9pt;
+            color: #64748b;
+            margin-top: 3px;
+        }
+        .receipt-badge {
+            text-align: right;
+        }
+        .receipt-heading {
+            font-size: 16pt;
+            font-weight: bold;
+            color: #0f172a;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .receipt-no {
+            font-size: 10.5pt;
+            color: #4f46e5;
+            font-weight: bold;
+            margin-top: 3px;
+        }
+        .info-table {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .info-card {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 12px;
+        }
+        .info-title {
+            font-size: 8pt;
+            font-weight: bold;
+            color: #64748b;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        .info-name {
+            font-size: 12pt;
+            font-weight: bold;
+            color: #0f172a;
+        }
+        .info-detail {
+            font-size: 9pt;
+            color: #475569;
+            margin-top: 2px;
+        }
+        .meter-box {
+            background-color: #eef2ff;
+            border: 1px solid #c7d2fe;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+        .meter-table {
+            width: 100%;
+        }
+        .meter-label {
+            font-size: 8pt;
+            color: #4338ca;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+        .meter-val {
+            font-size: 11pt;
+            font-weight: bold;
+            color: #312e81;
+            margin-top: 3px;
+        }
+        .charges-table {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .charges-table th {
+            background-color: #f1f5f9;
+            color: #334155;
+            font-size: 8.5pt;
+            text-transform: uppercase;
+            padding: 8px 10px;
+            text-align: left;
+            border-top: 1px solid #cbd5e1;
+            border-bottom: 1px solid #cbd5e1;
+        }
+        .charges-table td {
+            padding: 9px 10px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 9.5pt;
+        }
+        .charges-table .total-row td {
+            font-size: 13pt;
+            font-weight: bold;
+            color: #0f172a;
+            border-top: 2px solid #0f172a;
+            border-bottom: 2px solid #0f172a;
+            background-color: #f8fafc;
+        }
+        .status-box {
+            padding: 10px;
+            text-align: center;
+            margin-top: 15px;
+            margin-bottom: 25px;
+        }
+        .status-paid {
+            background-color: #dcfce7;
+            border: 2px solid #16a34a;
+            color: #15803d;
+        }
+        .status-pending {
+            background-color: #fef3c7;
+            border: 2px solid #d97706;
+            color: #b45309;
+        }
+        .footer-table {
+            width: 100%;
+            margin-top: 40px;
+        }
+        .terms {
+            font-size: 8pt;
+            color: #64748b;
+            line-height: 1.3;
+        }
+        .signature-line {
+            border-top: 1px solid #94a3b8;
+            padding-top: 5px;
+            font-size: 9pt;
+            text-align: center;
+            color: #475569;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Section -->
+    <table class="header-table">
+        <tr>
+            <td style="width: 55%; vertical-align: top;">
+                <div class="brand-title">SmartRent</div>
+                <div class="brand-subtitle">Property &amp; Tenant Management System</div>
+                <div style="margin-top: 6px; font-size: 8.5pt; color: #475569;">
+                    Landlord: <b>{{ landlord.get_full_name|default:landlord.username }}</b><br>
+                    Generated: {{ generated_at|date:"d M Y, h:i A" }}
+                </div>
+            </td>
+            <td style="width: 45%; vertical-align: top;" class="receipt-badge">
+                <div class="receipt-heading">Rent Receipt</div>
+                <div class="receipt-no"># {{ bill.receipt_number }}</div>
+                <div style="font-size: 9pt; color: #475569; margin-top: 4px;">
+                    Month: <b>{{ bill.billing_month }}</b><br>
+                    Due Date: <b>{{ bill.due_date|date:"d M, Y" }}</b>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Tenant & Room Details -->
+    <table class="info-table">
+        <tr>
+            <td style="width: 48%; vertical-align: top;">
+                <div class="info-card">
+                    <div class="info-title">Tenant Details</div>
+                    <div class="info-name">{{ bill.tenant.full_name }}</div>
+                    <div class="info-detail">Mobile: +91 {{ bill.tenant.mobile_number }}</div>
+                    <div class="info-detail">Move-in Date: {{ bill.tenant.move_in_date|date:"d M, Y" }}</div>
+                </div>
+            </td>
+            <td style="width: 4%;"></td>
+            <td style="width: 48%; vertical-align: top;">
+                <div class="info-card">
+                    <div class="info-title">Property / Room Details</div>
+                    <div class="info-name">Room {{ bill.room.room_number }}</div>
+                    <div class="info-detail">Type: {{ bill.room.get_property_type_display }}</div>
+                    <div class="info-detail">Billing Cycle: Due on {{ bill.room.billing_day }}th of month</div>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Sub-Meter Electricity Box -->
+    <div class="meter-box">
+        <table class="meter-table">
+            <tr>
+                <td style="width: 25%;">
+                    <div class="meter-label">Prev Reading</div>
+                    <div class="meter-val">{{ bill.previous_reading }}</div>
+                </td>
+                <td style="width: 25%;">
+                    <div class="meter-label">Current Reading</div>
+                    <div class="meter-val">{{ bill.current_reading }}</div>
+                </td>
+                <td style="width: 25%;">
+                    <div class="meter-label">Units Used</div>
+                    <div class="meter-val" style="color: #b45309;">{{ bill.units_consumed }} units</div>
+                </td>
+                <td style="width: 25%;">
+                    <div class="meter-label">Rate / Unit</div>
+                    <div class="meter-val">Rs. {{ bill.rate_per_unit }}</div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Itemized Billing Charges -->
+    <table class="charges-table">
+        <thead>
+            <tr>
+                <th style="width: 10%;">#</th>
+                <th style="width: 60%;">Particulars / Item Description</th>
+                <th style="width: 30%; text-align: right;">Amount (INR)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>1</td>
+                <td>
+                    <b>Monthly Room Rent</b><br>
+                    <span style="font-size: 8pt; color: #64748b;">For the month of {{ bill.billing_month }}</span>
+                </td>
+                <td style="text-align: right;">Rs. {{ bill.rent_amount }}</td>
+            </tr>
+            <tr>
+                <td>2</td>
+                <td>
+                    <b>Electricity Sub-Meter Charges</b><br>
+                    <span style="font-size: 8pt; color: #64748b;">
+                        {{ bill.units_consumed }} units consumed @ Rs.{{ bill.rate_per_unit }}/unit ({{ bill.previous_reading }} to {{ bill.current_reading }})
+                    </span>
+                </td>
+                <td style="text-align: right;">Rs. {{ bill.electricity_bill }}</td>
+            </tr>
+            <tr>
+                <td>3</td>
+                <td>
+                    <b>Maintenance / Amenities Charge</b><br>
+                    <span style="font-size: 8pt; color: #64748b;">Society / Cleaning / Water</span>
+                </td>
+                <td style="text-align: right;">Rs. {{ bill.maintenance_amount }}</td>
+            </tr>
+            <tr class="total-row">
+                <td colspan="2" style="text-align: right; padding-right: 15px;">GRAND TOTAL:</td>
+                <td style="text-align: right; color: #4f46e5;">Rs. {{ bill.total_bill }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Payment Status Stamp -->
+    {% if bill.payment_status == 'PAID' %}
+    <div class="status-box status-paid">
+        <span style="font-size: 13pt; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">
+            [PAID] PAYMENT RECEIVED IN FULL
+        </span>
+        <div style="font-size: 8.5pt; margin-top: 3px;">
+            Received on: <b>{{ bill.paid_on|date:"d M Y, h:i A" }}</b> | Receipt No: <b>{{ bill.receipt_number }}</b>
+        </div>
+    </div>
+    {% else %}
+    <div class="status-box status-pending">
+        <span style="font-size: 13pt; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">
+            [DUE] PAYMENT PENDING
+        </span>
+        <div style="font-size: 8.5pt; margin-top: 3px;">
+            Please clear the balance on or before: <b>{{ bill.due_date|date:"d M, Y" }}</b>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Footer & Signatures -->
+    <table class="footer-table">
+        <tr>
+            <td style="width: 60%; vertical-align: bottom;" class="terms">
+                <b>Terms &amp; Conditions:</b><br>
+                1. This is a computer-generated digital receipt issued via SmartRent PWA.<br>
+                2. Sub-meter readings are recorded accurately at billing day.<br>
+                3. Electricity charges are calculated strictly based on sub-meter consumption.<br>
+                4. For any billing queries, please contact landlord directly.
+            </td>
+            <td style="width: 10%;"></td>
+            <td style="width: 30%; vertical-align: bottom;">
+                <div style="height: 45px;"></div>
+                <div class="signature-line">
+                    <b>{{ landlord.get_full_name|default:landlord.username }}</b><br>
+                    <span style="font-size: 8pt; color: #64748b;">Authorized Signatory / Landlord</span>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+</body>
+</html>

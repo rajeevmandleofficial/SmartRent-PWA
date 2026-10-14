@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+
+{% block title %}Tenants & Document Vault | SmartRent{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                Tenants Directory & Document Vault
+            </h1>
+            <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+                Manage tenant profiles, room allocations, mobile numbers, Aadhaar cards and Rent Agreements.
+            </p>
+        </div>
+
+        <a href="{% url 'tenant_create' %}" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-500/25 active:scale-95 transition-all self-start sm:self-auto">
+            <i class="fa-solid fa-user-plus"></i>
+            <span>Onboard New Tenant</span>
+        </a>
+    </div>
+
+    <!-- Tenants Grid -->
+    {% if tenants %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {% for tenant in tenants %}
+        <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-brand-500/50 hover:shadow-lg transition-all group flex flex-col justify-between space-y-4">
+            <div>
+                <!-- Top Row: Name, Room, Status -->
+                <div class="flex items-start justify-between gap-2">
+                    <div class="flex items-center gap-3">
+                        <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 text-white flex items-center justify-center font-bold text-base shadow-sm">
+                            {{ tenant.full_name|slice:":1" }}
+                        </div>
+                        <div>
+                            <a href="{% url 'tenant_detail' tenant.pk %}" class="font-extrabold text-base text-slate-900 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
+                                {{ tenant.full_name }}
+                            </a>
+                            <p class="text-xs font-mono text-slate-400 font-semibold">
+                                +91 {{ tenant.mobile_number }}
+                            </p>
+                        </div>
+                    </div>
+
+                    {% if tenant.is_active %}
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                        Active
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                        Vacated
+                    </span>
+                    {% endif %}
+                </div>
+
+                <!-- Assigned Room & Details -->
+                <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Assigned Flat/Room:</span>
+                        {% if tenant.room %}
+                        <a href="{% url 'room_detail' tenant.room.pk %}" class="font-bold text-brand-600 hover:underline">
+                            Room {{ tenant.room.room_number }} ({{ tenant.room.get_property_type_display }})
+                        </a>
+                        {% else %}
+                        <span class="text-slate-400 italic">Unassigned</span>
+                        {% endif %}
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Move-in Date:</span>
+                        <span class="font-medium text-slate-700 dark:text-slate-300">{{ tenant.move_in_date|date:"d M, Y" }}</span>
+                    </div>
+                    {% if tenant.emergency_contact %}
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Emergency Phone:</span>
+                        <span class="font-mono text-slate-600 dark:text-slate-400">{{ tenant.emergency_contact }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Document Vault Status Pills -->
+                <div class="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1.5">Document Vault Status</p>
+                    <div class="flex items-center gap-2">
+                        <!-- Aadhaar Card Badge -->
+                        {% if tenant.aadhaar_document %}
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                            <i class="fa-solid fa-id-card"></i> Aadhaar OK
+                        </span>
+                        {% else %}
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                            <i class="fa-solid fa-triangle-exclamation"></i> Aadhaar Missing
+                        </span>
+                        {% endif %}
+
+                        <!-- Agreement Badge -->
+                        {% if tenant.agreement_document %}
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+                            <i class="fa-solid fa-file-contract"></i> Agreement OK
+                        </span>
+                        {% else %}
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                            <i class="fa-solid fa-minus"></i> No Agreement
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Action Buttons -->
+            <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
+                <a href="{% url 'tenant_detail' tenant.pk %}" class="flex-1 text-center py-2 px-3 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300 text-xs font-bold transition-colors">
+                    <i class="fa-solid fa-folder-open mr-1"></i> Open Vault
+                </a>
+                <a href="https://wa.me/91{{ tenant.mobile_number }}" target="_blank" class="w-8 h-8 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center text-xs shadow-sm transition-colors" title="Message on WhatsApp">
+                    <i class="fa-brands fa-whatsapp text-sm"></i>
+                </a>
+                <a href="{% url 'tenant_update' tenant.pk %}" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center justify-center text-xs transition-colors" title="Edit Tenant">
+                    <i class="fa-solid fa-user-pen"></i>
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="p-8 text-center rounded-2xl bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-800 space-y-3">
+        <div class="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-brand-600 dark:text-brand-400 flex items-center justify-center text-xl">
+            <i class="fa-solid fa-users"></i>
+        </div>
+        <h3 class="text-base font-bold text-slate-800 dark:text-white">Koi Tenant Nahi Mila</h3>
+        <p class="text-xs text-slate-500 max-w-sm mx-auto">
+            Naye tenant ko onboard karein aur unka Aadhaar aur Rent agreement document vault me securely store karein.
+        </p>
+        <a href="{% url 'tenant_create' %}" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm">
+            <i class="fa-solid fa-user-plus"></i> Onboard First Tenant
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

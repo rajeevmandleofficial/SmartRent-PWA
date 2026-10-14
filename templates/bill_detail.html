@@ -1,0 +1,232 @@
+{% extends 'base.html' %}
+
+{% block title %}Bill #{{ bill.receipt_number }} | SmartRent{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <!-- Breadcrumb & Top Bar -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <a href="{% url 'bill_list' %}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-brand-600 dark:hover:text-brand-400 transition-colors mb-1">
+                <i class="fa-solid fa-arrow-left"></i>
+                <span>Back to Bills Ledger</span>
+            </a>
+            <div class="flex items-center gap-3">
+                <h1 class="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight font-mono">
+                    {{ bill.receipt_number }}
+                </h1>
+                <!-- 1-Click Status Toggle HTMX -->
+                <div id="bill-status-wrapper">
+                    {% include 'partials/bill_status_badge.html' with bill=bill %}
+                </div>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Generated on {{ bill.created_at|date:"d M Y, h:i A" }}
+            </p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center gap-2 flex-wrap">
+            <!-- WhatsApp Reminder Button -->
+            <a href="{{ bill.whatsapp_url }}" target="_blank" rel="noopener noreferrer"
+               class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/25 active:scale-95 transition-all">
+                <i class="fa-brands fa-whatsapp text-lg"></i>
+                <span>Send WhatsApp Reminder</span>
+            </a>
+
+            <!-- Download PDF Receipt -->
+            <a href="{% url 'bill_receipt_pdf' bill.pk %}" target="_blank"
+               class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-brand-600 hover:bg-brand-500 text-white shadow-md shadow-brand-600/25 active:scale-95 transition-all">
+                <i class="fa-solid fa-file-pdf"></i>
+                <span>Download PDF Receipt</span>
+            </a>
+
+            <!-- Delete Bill -->
+            <a href="{% url 'bill_delete' bill.pk %}"
+               class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 dark:bg-slate-800 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 transition-colors"
+               title="Delete Bill">
+                <i class="fa-solid fa-trash-can text-sm"></i>
+            </a>
+        </div>
+    </div>
+
+    <!-- Bill Overview Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Room & Property Info -->
+        <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Property Details</span>
+            <div>
+                <a href="{% url 'room_detail' bill.room.pk %}" class="text-lg font-extrabold text-slate-900 dark:text-white hover:text-brand-600 transition-colors">
+                    Room {{ bill.room.room_number }}
+                </a>
+                <p class="text-xs text-slate-500">{{ bill.room.get_property_type_display }}</p>
+            </div>
+            <div class="pt-2 border-t border-slate-100 dark:border-slate-800 text-xs space-y-1">
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Billing Day:</span>
+                    <span class="font-semibold">{{ bill.room.billing_day }} of month</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Due Date:</span>
+                    <span class="font-bold text-rose-600 dark:text-rose-400">{{ bill.due_date|date:"d M, Y" }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tenant Info -->
+        <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Tenant Details</span>
+            <div>
+                <a href="{% url 'tenant_detail' bill.tenant.pk %}" class="text-lg font-extrabold text-slate-900 dark:text-white hover:text-brand-600 transition-colors">
+                    {{ bill.tenant.full_name }}
+                </a>
+                <p class="text-xs font-mono text-slate-500 font-semibold">{{ bill.tenant.mobile_number }}</p>
+            </div>
+            <div class="pt-2 border-t border-slate-100 dark:border-slate-800 text-xs space-y-1">
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Move-in Date:</span>
+                    <span class="font-semibold">{{ bill.tenant.move_in_date|date:"d M, Y" }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Document Vault:</span>
+                    <span class="font-bold text-emerald-600 dark:text-emerald-400">Verified</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Bill Card -->
+        <div class="p-5 rounded-2xl bg-gradient-to-br from-indigo-900 to-slate-900 text-white border border-indigo-800/80 shadow-md flex flex-col justify-between">
+            <div>
+                <span class="text-xs font-bold uppercase tracking-wider text-indigo-300">Total Amount Due</span>
+                <p class="text-3xl font-extrabold font-mono mt-1 text-white">₹{{ bill.total_bill }}</p>
+                <p class="text-xs text-indigo-300 mt-1">Month: {{ bill.billing_month }}</p>
+            </div>
+            <div class="mt-4 pt-3 border-t border-indigo-800/60 flex items-center justify-between text-xs">
+                <span class="text-indigo-300">Status:</span>
+                {% if bill.payment_status == 'PAID' %}
+                <span class="font-bold text-emerald-300 flex items-center gap-1">
+                    <i class="fa-solid fa-circle-check"></i> Paid on {{ bill.paid_on|date:"d M Y" }}
+                </span>
+                {% else %}
+                <span class="font-bold text-amber-300 flex items-center gap-1">
+                    <i class="fa-solid fa-clock"></i> Unpaid / Due
+                </span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Sub-Meter & Charges Breakdown -->
+    <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div class="p-5 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
+            <h2 class="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                <i class="fa-solid fa-list-check text-brand-600"></i>
+                <span>Itemized Bill Calculation & Breakdown</span>
+            </h2>
+            <span class="text-xs font-mono text-slate-400">Receipt #{{ bill.receipt_number }}</span>
+        </div>
+
+        <div class="p-6 space-y-6">
+            <!-- Sub-meter Electricity Box -->
+            <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                        <i class="fa-solid fa-bolt"></i>
+                        Sub-Meter Electricity Breakdown
+                    </span>
+                    <span class="text-xs font-mono text-slate-500">Rate: ₹{{ bill.rate_per_unit }}/unit</span>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    <div class="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                        <p class="text-slate-400">Previous Reading</p>
+                        <p class="font-mono font-bold text-slate-800 dark:text-white text-base mt-0.5">{{ bill.previous_reading }}</p>
+                    </div>
+                    <div class="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                        <p class="text-slate-400">Current Reading</p>
+                        <p class="font-mono font-bold text-slate-800 dark:text-white text-base mt-0.5">{{ bill.current_reading }}</p>
+                    </div>
+                    <div class="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                        <p class="text-slate-400">Units Consumed</p>
+                        <p class="font-mono font-bold text-amber-600 dark:text-amber-400 text-base mt-0.5">{{ bill.units_consumed }} units</p>
+                    </div>
+                    <div class="p-3 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800">
+                        <p class="text-indigo-600 dark:text-indigo-400 font-semibold">Electricity Amount</p>
+                        <p class="font-mono font-extrabold text-indigo-700 dark:text-indigo-300 text-base mt-0.5">₹{{ bill.electricity_bill }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Full Cost Table -->
+            <table class="w-full text-xs sm:text-sm">
+                <thead>
+                    <tr class="text-slate-400 uppercase text-[11px] font-bold border-b border-slate-100 dark:border-slate-800 pb-2">
+                        <th class="text-left pb-2">Charge Description</th>
+                        <th class="text-right pb-2">Amount (₹)</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                    <tr>
+                        <td class="py-3 text-slate-700 dark:text-slate-300">
+                            Base Monthly Rent
+                        </td>
+                        <td class="py-3 text-right font-mono font-semibold text-slate-900 dark:text-white">
+                            ₹{{ bill.rent_amount }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="py-3 text-slate-700 dark:text-slate-300">
+                            Sub-Meter Electricity Charge ({{ bill.units_consumed }} units @ ₹{{ bill.rate_per_unit }})
+                        </td>
+                        <td class="py-3 text-right font-mono font-semibold text-slate-900 dark:text-white">
+                            ₹{{ bill.electricity_bill }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="py-3 text-slate-700 dark:text-slate-300">
+                            Maintenance / Society Charges
+                        </td>
+                        <td class="py-3 text-right font-mono font-semibold text-slate-900 dark:text-white">
+                            ₹{{ bill.maintenance_amount }}
+                        </td>
+                    </tr>
+                    <tr class="border-t-2 border-slate-200 dark:border-slate-700 font-bold text-base">
+                        <td class="py-4 text-slate-900 dark:text-white">
+                            Total Monthly Bill
+                        </td>
+                        <td class="py-4 text-right font-mono font-extrabold text-brand-600 dark:text-brand-400 text-lg">
+                            ₹{{ bill.total_bill }}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- WhatsApp Share Preview Box -->
+    <div class="p-5 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/60 space-y-3">
+        <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                <i class="fa-brands fa-whatsapp text-emerald-600 text-base"></i>
+                WhatsApp 1-Click Reminder Message Preview
+            </span>
+            <a href="{{ bill.whatsapp_url }}" target="_blank"
+               class="text-xs font-bold text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 hover:underline">
+                Open in WhatsApp &rarr;
+            </a>
+        </div>
+        <div class="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-emerald-100 dark:border-emerald-900/40 text-xs font-mono text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed">
+Namaste {{ bill.tenant.full_name }} ji! 🙏
+Aapka SmartRent monthly bill generate ho gaya hai:
+🏠 Room / Flat: {{ bill.room.room_number }}
+📅 Billing Month: {{ bill.billing_month }}
+⏰ Due Date: {{ bill.due_date|date:"d M, Y" }}
+💰 Monthly Rent: ₹{{ bill.rent_amount }}
+⚡ Sub-Meter: {{ bill.previous_reading }} to {{ bill.current_reading }} ({{ bill.units_consumed }} units = ₹{{ bill.electricity_bill }})
+🛠 Maintenance: ₹{{ bill.maintenance_amount }}
+💵 TOTAL AMOUNT DUE: ₹{{ bill.total_bill }}
+📄 Bill No: {{ bill.receipt_number }}
+        </div>
+    </div>
+</div>
+{% endblock %}

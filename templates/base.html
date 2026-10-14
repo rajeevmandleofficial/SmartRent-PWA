@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="SmartRent - All-in-one Property & Tenant Management PWA for Landlords. Manage rooms, tenants, sub-meters, bills & receipts.">
+    <meta name="theme-color" content="#4f46e5">
+    <title>{% block title %}SmartRent | Smart Property & Tenant Management{% endblock %}</title>
+
+    <!-- PWA Manifest & Favicon -->
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+    <link rel="icon" type="image/png" href="/static/icons/icon-192.png">
+
+    <!-- Fonts: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            200: '#c7d2fe',
+                            300: '#a5b4fc',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#312e81',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- HTMX for Reactive 1-Click Updates -->
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+
+    <!-- Alpine.js for Client-side Reactivity & Live Calculations -->
+    <script defer src="https://unpkg.com/alpinejs@3.13.10/dist/cdn.min.js"></script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        .dark ::-webkit-scrollbar-thumb { background: #334155; }
+    </style>
+</head>
+
+<body class="h-full bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans antialiased selection:bg-brand-500 selection:text-white"
+      x-data="{ mobileMenuOpen: false, darkMode: localStorage.getItem('theme') === 'dark' }"
+      :class="{ 'dark': darkMode }"
+      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+
+    <div class="min-h-full flex flex-col pb-20 md:pb-6">
+        <!-- Top Navigation Bar -->
+        <header class="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 transition-colors">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <!-- Brand Logo -->
+                    <div class="flex items-center gap-3">
+                        <a href="{% url 'dashboard' %}" class="flex items-center gap-2.5 group">
+                            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-brand-500/25 group-hover:scale-105 transition-transform duration-200">
+                                <i class="fa-solid fa-bolt text-lg"></i>
+                            </div>
+                            <div>
+                                <span class="font-extrabold text-xl tracking-tight bg-gradient-to-r from-slate-900 via-brand-700 to-indigo-600 dark:from-white dark:via-brand-300 dark:to-indigo-400 bg-clip-text text-transparent">
+                                    SmartRent
+                                </span>
+                                <span class="hidden sm:inline-block ml-1.5 px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase rounded-full bg-brand-50 text-brand-700 dark:bg-brand-950/80 dark:text-brand-300 border border-brand-200 dark:border-brand-800">
+                                    PWA
+                                </span>
+                            </div>
+                        </a>
+
+                        <!-- Desktop Main Links -->
+                        {% if user.is_authenticated %}
+                        <nav class="hidden md:flex items-center gap-1 ml-8">
+                            <a href="{% url 'dashboard' %}" class="px-3 py-2 rounded-lg text-sm font-semibold transition-colors {% if request.resolver_match.url_name == 'dashboard' %}bg-brand-50 text-brand-700 dark:bg-slate-800 dark:text-brand-400{% else %}text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60{% endif %}">
+                                <i class="fa-solid fa-chart-pie mr-1.5 opacity-80"></i>Dashboard
+                            </a>
+                            <a href="{% url 'room_list' %}" class="px-3 py-2 rounded-lg text-sm font-semibold transition-colors {% if 'room' in request.resolver_match.url_name %}bg-brand-50 text-brand-700 dark:bg-slate-800 dark:text-brand-400{% else %}text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60{% endif %}">
+                                <i class="fa-solid fa-door-open mr-1.5 opacity-80"></i>Rooms
+                            </a>
+                            <a href="{% url 'tenant_list' %}" class="px-3 py-2 rounded-lg text-sm font-semibold transition-colors {% if 'tenant' in request.resolver_match.url_name %}bg-brand-50 text-brand-700 dark:bg-slate-800 dark:text-brand-400{% else %}text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60{% endif %}">
+                                <i class="fa-solid fa-users mr-1.5 opacity-80"></i>Tenants
+                            </a>
+                            <a href="{% url 'bill_list' %}" class="px-3 py-2 rounded-lg text-sm font-semibold transition-colors {% if 'bill' in request.resolver_match.url_name %}bg-brand-50 text-brand-700 dark:bg-slate-800 dark:text-brand-400{% else %}text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60{% endif %}">
+                                <i class="fa-solid fa-file-invoice-dollar mr-1.5 opacity-80"></i>Bills & Ledger
+                            </a>
+                        </nav>
+                        {% endif %}
+                    </div>
+
+                    <!-- Right Controls -->
+                    <div class="flex items-center gap-3">
+                        <!-- Quick Add Action -->
+                        {% if user.is_authenticated %}
+                        <a href="{% url 'bill_create' %}" class="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white shadow-sm shadow-brand-500/20 active:scale-95 transition-all">
+                            <i class="fa-solid fa-plus text-xs"></i>
+                            <span>New Bill</span>
+                        </a>
+                        {% endif %}
+
+                        <!-- Dark Mode Toggle Button -->
+                        <button type="button"
+                                @click="darkMode = !darkMode; localStorage.setItem('theme', darkMode ? 'dark' : 'light')"
+                                class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors"
+                                title="Toggle Theme">
+                            <i class="fa-solid fa-moon text-sm" x-show="!darkMode"></i>
+                            <i class="fa-solid fa-sun text-sm text-amber-400" x-show="darkMode" x-cloak></i>
+                        </button>
+
+                        <!-- User Profile / Auth State -->
+                        {% if user.is_authenticated %}
+                        <div class="relative" x-data="{ userMenu: false }">
+                            <button @click="userMenu = !userMenu" @click.outside="userMenu = false"
+                                    class="flex items-center gap-2 pl-2 pr-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium hover:border-brand-500 transition-colors">
+                                <div class="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-900/60 text-brand-700 dark:text-brand-300 flex items-center justify-center font-bold text-xs uppercase">
+                                    {{ user.username|slice:":2" }}
+                                </div>
+                                <span class="hidden sm:inline font-semibold text-xs text-slate-700 dark:text-slate-200">
+                                    {{ user.first_name|default:user.username }}
+                                </span>
+                                <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
+                            </button>
+
+                            <div x-show="userMenu" x-cloak
+                                 x-transition:enter="transition ease-out duration-100"
+                                 x-transition:enter-start="transform opacity-0 scale-95"
+                                 x-transition:enter-end="transform opacity-100 scale-100"
+                                 x-transition:leave="transition ease-in duration-75"
+                                 x-transition:leave-start="transform opacity-100 scale-100"
+                                 x-transition:leave-end="transform opacity-0 scale-95"
+                                 class="absolute right-0 mt-2 w-48 rounded-2xl bg-white dark:bg-slate-800 shadow-xl border border-slate-100 dark:border-slate-700 py-2 z-50">
+                                <div class="px-4 py-2 border-b border-slate-100 dark:border-slate-700/60">
+                                    <p class="text-xs font-semibold text-slate-500 dark:text-slate-400">Signed in as</p>
+                                    <p class="text-sm font-bold text-slate-900 dark:text-white truncate">{{ user.username }}</p>
+                                </div>
+                                <a href="{% url 'room_create' %}" class="flex items-center gap-2 px-4 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                    <i class="fa-solid fa-plus text-brand-500"></i> Add Room
+                                </a>
+                                <a href="{% url 'tenant_create' %}" class="flex items-center gap-2 px-4 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                    <i class="fa-solid fa-user-plus text-emerald-500"></i> Add Tenant
+                                </a>
+                                <div class="border-t border-slate-100 dark:border-slate-700/60 my-1"></div>
+                                <a href="{% url 'logout' %}" class="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30">
+                                    <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout
+                                </a>
+                            </div>
+                        </div>
+                        {% else %}
+                        <a href="{% url 'login' %}" class="px-4 py-2 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                            Login
+                        </a>
+                        <a href="{% url 'register' %}" class="px-4 py-2 rounded-xl text-sm font-bold bg-brand-600 hover:bg-brand-500 text-white shadow-sm transition-all">
+                            Sign Up
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Django Messages Toast System -->
+        {% if messages %}
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 w-full">
+            {% for message in messages %}
+            <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)"
+                 class="mb-3 flex items-center justify-between p-4 rounded-2xl shadow-sm border text-sm font-medium transition-all
+                 {% if message.tags == 'error' %}bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/40 dark:border-rose-900/60 dark:text-rose-300
+                 {% elif message.tags == 'success' %}bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-900/60 dark:text-emerald-300
+                 {% else %}bg-indigo-50 border-indigo-200 text-indigo-800 dark:bg-indigo-950/40 dark:border-indigo-900/60 dark:text-indigo-300{% endif %}">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid {% if message.tags == 'error' %}fa-circle-exclamation text-rose-500{% elif message.tags == 'success' %}fa-circle-check text-emerald-500{% else %}fa-circle-info text-indigo-500{% endif %} text-base"></i>
+                    <span>{{ message }}</span>
+                </div>
+                <button @click="show = false" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Main Content Area -->
+        <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- Mobile Bottom Floating Navigation Bar (PWA Style) -->
+        {% if user.is_authenticated %}
+        <nav class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 px-3 py-2 flex items-center justify-around shadow-2xl">
+            <a href="{% url 'dashboard' %}" class="flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-colors {% if request.resolver_match.url_name == 'dashboard' %}text-brand-600 dark:text-brand-400 font-bold{% else %}text-slate-500 dark:text-slate-400 font-medium{% endif %}">
+                <i class="fa-solid fa-chart-pie text-lg"></i>
+                <span class="text-[10px]">Home</span>
+            </a>
+            <a href="{% url 'room_list' %}" class="flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-colors {% if 'room' in request.resolver_match.url_name %}text-brand-600 dark:text-brand-400 font-bold{% else %}text-slate-500 dark:text-slate-400 font-medium{% endif %}">
+                <i class="fa-solid fa-door-open text-lg"></i>
+                <span class="text-[10px]">Rooms</span>
+            </a>
+            <!-- Floating Add Button in Center -->
+            <a href="{% url 'bill_create' %}" class="-mt-5 w-12 h-12 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-brand-500/40 active:scale-95 transition-transform">
+                <i class="fa-solid fa-bolt text-lg"></i>
+            </a>
+            <a href="{% url 'tenant_list' %}" class="flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-colors {% if 'tenant' in request.resolver_match.url_name %}text-brand-600 dark:text-brand-400 font-bold{% else %}text-slate-500 dark:text-slate-400 font-medium{% endif %}">
+                <i class="fa-solid fa-users text-lg"></i>
+                <span class="text-[10px]">Tenants</span>
+            </a>
+            <a href="{% url 'bill_list' %}" class="flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-colors {% if 'bill' in request.resolver_match.url_name %}text-brand-600 dark:text-brand-400 font-bold{% else %}text-slate-500 dark:text-slate-400 font-medium{% endif %}">
+                <i class="fa-solid fa-file-invoice-dollar text-lg"></i>
+                <span class="text-[10px]">Ledger</span>
+            </a>
+        </nav>
+        {% endif %}
+    </div>
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/service-worker.js')
+                    .then(reg => console.log('[SmartRent PWA] Service Worker registered:', reg.scope))
+                    .catch(err => console.warn('[SmartRent PWA] Service Worker failed:', err));
+            });
+        }
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

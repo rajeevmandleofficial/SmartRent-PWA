@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+
+{% block title %}Monthly Bills & Ledger | SmartRent{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                Monthly Bills & Rent Ledger
+            </h1>
+            <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+                Sub-meter electricity calculations, rent status, WhatsApp reminders and downloadable PDF receipts.
+            </p>
+        </div>
+
+        <a href="{% url 'bill_create' %}" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white shadow-md shadow-brand-500/25 active:scale-95 transition-all self-start sm:self-auto">
+            <i class="fa-solid fa-bolt text-amber-300"></i>
+            <span>Generate New Bill</span>
+        </a>
+    </div>
+
+    <!-- Summary Balance Bar -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Pending / Baaki</p>
+                <p class="text-2xl font-extrabold text-rose-600 dark:text-rose-400 mt-0.5 font-mono">₹{{ total_pending }}</p>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 flex items-center justify-center text-lg">
+                <i class="fa-solid fa-clock"></i>
+            </div>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Collected / Jama</p>
+                <p class="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5 font-mono">₹{{ total_paid }}</p>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center text-lg">
+                <i class="fa-solid fa-circle-check"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters & Search Bar -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+        <div class="flex items-center gap-2 overflow-x-auto">
+            <a href="{% url 'bill_list' %}" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors {% if status_filter == 'all' %}bg-brand-600 text-white shadow-sm{% else %}text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800{% endif %}">
+                All Bills
+            </a>
+            <a href="{% url 'bill_list' %}?status=PENDING{% if month_filter %}&month={{ month_filter }}{% endif %}" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors {% if status_filter == 'PENDING' %}bg-amber-600 text-white shadow-sm{% else %}text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800{% endif %}">
+                Pending / Baaki
+            </a>
+            <a href="{% url 'bill_list' %}?status=PAID{% if month_filter %}&month={{ month_filter }}{% endif %}" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors {% if status_filter == 'PAID' %}bg-emerald-600 text-white shadow-sm{% else %}text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800{% endif %}">
+                Paid / Jama
+            </a>
+        </div>
+
+        <!-- Month Filter Form -->
+        <form method="get" class="flex items-center gap-2">
+            {% if status_filter != 'all' %}
+            <input type="hidden" name="status" value="{{ status_filter }}">
+            {% endif %}
+            <input type="text" name="month" value="{{ month_filter }}" placeholder="Filter by Month (e.g. Oct 2026)"
+                   class="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-brand-500">
+            <button type="submit" class="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-colors">
+                Filter
+            </button>
+            {% if month_filter %}
+            <a href="{% url 'bill_list' %}" class="text-xs text-rose-500 hover:underline">Reset</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Bills Ledger Table -->
+    {% if bills %}
+    <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs sm:text-sm">
+                <thead class="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 text-xs uppercase font-bold tracking-wider border-b border-slate-200 dark:border-slate-800">
+                    <tr>
+                        <th class="px-4 py-3.5">Bill / Month</th>
+                        <th class="px-4 py-3.5">Room & Tenant</th>
+                        <th class="px-4 py-3.5">⚡ Meter (Prev &rarr; Curr)</th>
+                        <th class="px-4 py-3.5">Electricity Amt</th>
+                        <th class="px-4 py-3.5">Total Amount</th>
+                        <th class="px-4 py-3.5">Due Date</th>
+                        <th class="px-4 py-3.5 text-center">Status (1-Click)</th>
+                        <th class="px-4 py-3.5 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                    {% for bill in bills %}
+                    <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                        <!-- Bill Number & Month -->
+                        <td class="px-4 py-3.5 whitespace-nowrap">
+                            <a href="{% url 'bill_detail' bill.pk %}" class="font-bold text-brand-600 dark:text-brand-400 hover:underline font-mono">
+                                {{ bill.receipt_number }}
+                            </a>
+                            <p class="text-xs text-slate-400 font-medium">{{ bill.billing_month }}</p>
+                        </td>
+
+                        <!-- Room & Tenant -->
+                        <td class="px-4 py-3.5 whitespace-nowrap">
+                            <div class="font-semibold text-slate-900 dark:text-white">
+                                Room {{ bill.room.room_number }}
+                            </div>
+                            <div class="text-xs text-slate-500 flex items-center gap-1">
+                                <i class="fa-solid fa-user text-[10px] text-slate-400"></i>
+                                <span>{{ bill.tenant.full_name }}</span>
+                            </div>
+                        </td>
+
+                        <!-- Sub-meter Readings -->
+                        <td class="px-4 py-3.5 whitespace-nowrap">
+                            <span class="font-mono text-slate-700 dark:text-slate-300">
+                                {{ bill.previous_reading }} &rarr; <b>{{ bill.current_reading }}</b>
+                            </span>
+                            <p class="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold">
+                                {{ bill.units_consumed }} units
+                            </p>
+                        </td>
+
+                        <!-- Electricity Amount -->
+                        <td class="px-4 py-3.5 whitespace-nowrap font-mono text-slate-700 dark:text-slate-300">
+                            ₹{{ bill.electricity_bill }}
+                        </td>
+
+                        <!-- Total Bill -->
+                        <td class="px-4 py-3.5 whitespace-nowrap font-extrabold text-slate-900 dark:text-white text-base">
+                            ₹{{ bill.total_bill }}
+                        </td>
+
+                        <!-- Due Date -->
+                        <td class="px-4 py-3.5 whitespace-nowrap text-xs text-slate-500">
+                            {{ bill.due_date|date:"d M, Y" }}
+                        </td>
+
+                        <!-- 1-Click Status Toggle (HTMX) -->
+                        <td class="px-4 py-3.5 whitespace-nowrap text-center">
+                            {% include 'partials/bill_status_badge.html' with bill=bill %}
+                        </td>
+
+                        <!-- Action Buttons -->
+                        <td class="px-4 py-3.5 whitespace-nowrap text-right space-x-1">
+                            <!-- WhatsApp Deep Link Button -->
+                            <a href="{{ bill.whatsapp_url }}" target="_blank" rel="noopener noreferrer"
+                               title="Send WhatsApp Reminder"
+                               class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white transition-all shadow-sm shadow-emerald-500/20 active:scale-95">
+                                <i class="fa-brands fa-whatsapp text-base"></i>
+                            </a>
+
+                            <!-- Download PDF Receipt -->
+                            <a href="{% url 'bill_receipt_pdf' bill.pk %}" target="_blank"
+                               title="Download PDF Receipt"
+                               class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors">
+                                <i class="fa-solid fa-file-pdf text-rose-500"></i>
+                            </a>
+
+                            <!-- Details -->
+                            <a href="{% url 'bill_detail' bill.pk %}"
+                               title="View Details"
+                               class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors">
+                                <i class="fa-solid fa-eye text-xs"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="p-8 text-center rounded-2xl bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-800 space-y-3">
+        <div class="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-brand-600 dark:text-brand-400 flex items-center justify-center text-xl">
+            <i class="fa-solid fa-file-invoice-dollar"></i>
+        </div>
+        <h3 class="text-base font-bold text-slate-800 dark:text-white">Koi Bill Match Nahi Hua</h3>
+        <p class="text-xs text-slate-500 max-w-sm mx-auto">
+            Abhi is filter ke mutabiq koi bill record available nahi hai. Naya bill generate karein.
+        </p>
+        <a href="{% url 'bill_create' %}" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-500 text-white shadow-sm">
+            <i class="fa-solid fa-bolt"></i> Generate Bill
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

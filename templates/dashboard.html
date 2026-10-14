@@ -1,0 +1,378 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard | SmartRent{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Header Greeting & Quick Actions -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <div class="flex items-center gap-2">
+                <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                    Namaste, {{ user.first_name|default:user.username }}! 👋
+                </h1>
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                    Live System
+                </span>
+            </div>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                Aapke properties, tenants, sub-meter readings aur rent collection ka live control center.
+            </p>
+        </div>
+
+        <div class="flex items-center gap-2.5 flex-wrap">
+            <a href="{% url 'room_create' %}" class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-brand-500 hover:text-brand-600 transition-all shadow-sm">
+                <i class="fa-solid fa-plus text-brand-500"></i>
+                <span>Add Room</span>
+            </a>
+            <a href="{% url 'tenant_create' %}" class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-emerald-500 hover:text-emerald-600 transition-all shadow-sm">
+                <i class="fa-solid fa-user-plus text-emerald-500"></i>
+                <span>Add Tenant</span>
+            </a>
+            <a href="{% url 'bill_create' %}" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white shadow-md shadow-brand-500/25 active:scale-95 transition-all">
+                <i class="fa-solid fa-bolt text-amber-300"></i>
+                <span>Generate Auto-Bill</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- 4 Key Metric Summary Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Card 1: Total Rooms & Occupancy -->
+        <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm relative overflow-hidden group">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Rooms / Flats</p>
+                    <p class="text-3xl font-extrabold text-slate-900 dark:text-white mt-1.5">{{ total_rooms }}</p>
+                </div>
+                <div class="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-brand-600 dark:text-brand-400 flex items-center justify-center text-xl shadow-inner">
+                    <i class="fa-solid fa-building"></i>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center gap-2 text-xs">
+                <span class="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400">
+                    <i class="fa-solid fa-circle text-[8px]"></i> {{ occupied_rooms }} Bhare hue
+                </span>
+                <span class="text-slate-300 dark:text-slate-700">•</span>
+                <span class="inline-flex items-center gap-1 font-bold text-amber-500">
+                    <i class="fa-solid fa-circle text-[8px]"></i> {{ vacant_rooms }} Khali
+                </span>
+            </div>
+        </div>
+
+        <!-- Card 2: Occupancy Rate -->
+        <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm relative overflow-hidden group">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Occupancy Status</p>
+                    <p class="text-3xl font-extrabold text-slate-900 dark:text-white mt-1.5">
+                        {% if total_rooms > 0 %}
+                            {% widthratio occupied_rooms total_rooms 100 %}%
+                        {% else %}
+                            0%
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xl shadow-inner">
+                    <i class="fa-solid fa-chart-pie"></i>
+                </div>
+            </div>
+            <div class="mt-4 w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+                <div class="bg-gradient-to-r from-emerald-500 to-teal-400 h-2 rounded-full"
+                     style="width: {% if total_rooms > 0 %}{% widthratio occupied_rooms total_rooms 100 %}%{% else %}0%{% endif %}"></div>
+            </div>
+        </div>
+
+        <!-- Card 3: Collected Rent This Month -->
+        <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm relative overflow-hidden group">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Rent Collected ({{ current_month_str }})</p>
+                    <p class="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1.5">₹{{ collected_month }}</p>
+                </div>
+                <div class="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xl shadow-inner">
+                    <i class="fa-solid fa-wallet"></i>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                <i class="fa-solid fa-check-double text-emerald-500"></i>
+                <span>Lifetime Jama: <b>₹{{ total_collected_lifetime }}</b></span>
+            </div>
+        </div>
+
+        <!-- Card 4: Total Pending Rent -->
+        <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm relative overflow-hidden group">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Pending Rent</p>
+                    <p class="text-3xl font-extrabold text-rose-600 dark:text-rose-400 mt-1.5">₹{{ total_pending }}</p>
+                </div>
+                <div class="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center text-xl shadow-inner">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 font-semibold">
+                <i class="fa-brands fa-whatsapp text-emerald-500"></i>
+                <span>Send WhatsApp reminders in 1-click</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Flat & Room Registry Section -->
+    <div class="space-y-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <h2 class="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
+                    Flat & Room Registry
+                </h2>
+                <span class="px-2 py-0.5 text-xs font-bold rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                    {{ total_rooms }} Rooms
+                </span>
+            </div>
+            <a href="{% url 'room_list' %}" class="text-xs sm:text-sm font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 hover:underline flex items-center gap-1">
+                <span>View all</span>
+                <i class="fa-solid fa-arrow-right text-[10px]"></i>
+            </a>
+        </div>
+
+        {% if rooms %}
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {% for room in rooms %}
+            <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-brand-500/50 hover:shadow-lg transition-all group relative flex flex-col justify-between">
+                <!-- Top Row: Room number & Live Occupancy Badge -->
+                <div>
+                    <div class="flex items-start justify-between gap-2">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="font-extrabold text-xl text-slate-900 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
+                                    Room {{ room.room_number }}
+                                </span>
+                            </div>
+                            <span class="text-xs font-medium text-slate-400 dark:text-slate-500">
+                                {{ room.get_property_type_display }}
+                            </span>
+                        </div>
+
+                        <!-- Color Coded Live Badges: Green = Occupied, Amber/Red = Vacant -->
+                        {% if room.is_occupied %}
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/80">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span>Bhara hua</span>
+                        </span>
+                        {% else %}
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800/80">
+                            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                            <span>Khali (Vacant)</span>
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Room Pricing & Meter Stats -->
+                    <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 space-y-2 text-xs">
+                        <div class="flex items-center justify-between">
+                            <span class="text-slate-500 dark:text-slate-400">Monthly Rent:</span>
+                            <span class="font-bold text-slate-900 dark:text-white">₹{{ room.base_rent }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-slate-500 dark:text-slate-400">⚡ Sub-Meter Reading:</span>
+                            <span class="font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded">
+                                {{ room.current_meter_reading }} kWh
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-slate-500 dark:text-slate-400">Electricity Rate:</span>
+                            <span class="font-medium text-slate-700 dark:text-slate-300">₹{{ room.electricity_rate_per_unit }}/unit</span>
+                        </div>
+                    </div>
+
+                    <!-- Tenant Info / Vacant Prompt -->
+                    <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80">
+                        {% if room.active_tenant %}
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <div class="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-900 text-brand-700 dark:text-brand-300 flex items-center justify-center font-bold text-xs">
+                                    {{ room.active_tenant.full_name|slice:":1" }}
+                                </div>
+                                <div>
+                                    <p class="text-xs font-bold text-slate-900 dark:text-white leading-tight">
+                                        {{ room.active_tenant.full_name }}
+                                    </p>
+                                    <p class="text-[11px] text-slate-400 font-mono">
+                                        {{ room.active_tenant.mobile_number }}
+                                    </p>
+                                </div>
+                            </div>
+                            <!-- Document Vault Quick Access Icon -->
+                            <a href="{% url 'tenant_detail' room.active_tenant.pk %}"
+                               title="Tenant Document Vault"
+                               class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-brand-50 text-slate-600 hover:text-brand-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-brand-400 flex items-center justify-center text-xs transition-colors">
+                                <i class="fa-solid fa-folder-open"></i>
+                            </a>
+                        </div>
+                        {% else %}
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-slate-400 italic">No tenant assigned</span>
+                            <a href="{% url 'tenant_create' %}?room={{ room.id }}" class="text-xs font-bold text-brand-600 hover:underline">
+                                + Assign Tenant
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Action Button -->
+                <div class="mt-4 pt-3 flex items-center gap-2">
+                    <a href="{% url 'room_detail' room.id %}" class="flex-1 text-center py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors">
+                        View Details
+                    </a>
+                    {% if room.active_tenant %}
+                    <a href="{% url 'bill_create' %}?room={{ room.id }}" class="py-2 px-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold shadow-sm transition-colors" title="Create monthly bill">
+                        <i class="fa-solid fa-bolt"></i> Bill
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <!-- Empty State -->
+        <div class="p-8 text-center rounded-2xl bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-800 space-y-3">
+            <div class="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-brand-600 dark:text-brand-400 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-door-closed"></i>
+            </div>
+            <h3 class="text-base font-bold text-slate-800 dark:text-white">Koi Room Add Nahi Hai Abhi</h3>
+            <p class="text-xs text-slate-500 max-w-sm mx-auto">
+                Apne flats, rooms ya commercial shops add karein aur monthly rent aur sub-meter readings manage karna shuru karein.
+            </p>
+            <a href="{% url 'room_create' %}" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-500 text-white shadow-sm">
+                <i class="fa-solid fa-plus"></i> Add First Room
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Recent Bills Ledger & WhatsApp Reminder Module -->
+    <div class="space-y-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <h2 class="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
+                    Monthly Bills & Ledger
+                </h2>
+                <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                    (1-Click HTMX Status Toggle & WhatsApp Reminders)
+                </span>
+            </div>
+            <a href="{% url 'bill_list' %}" class="text-xs sm:text-sm font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 hover:underline flex items-center gap-1">
+                <span>All Bills</span>
+                <i class="fa-solid fa-arrow-right text-[10px]"></i>
+            </a>
+        </div>
+
+        {% if recent_bills %}
+        <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs sm:text-sm">
+                    <thead class="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 text-xs uppercase font-bold tracking-wider border-b border-slate-200 dark:border-slate-800">
+                        <tr>
+                            <th class="px-4 py-3.5">Bill / Month</th>
+                            <th class="px-4 py-3.5">Room & Tenant</th>
+                            <th class="px-4 py-3.5">⚡ Meter (Prev &rarr; Curr)</th>
+                            <th class="px-4 py-3.5">Total Amount</th>
+                            <th class="px-4 py-3.5">Due Date</th>
+                            <th class="px-4 py-3.5 text-center">Status (1-Click)</th>
+                            <th class="px-4 py-3.5 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                        {% for bill in recent_bills %}
+                        <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                            <!-- Bill / Month -->
+                            <td class="px-4 py-3.5 whitespace-nowrap">
+                                <a href="{% url 'bill_detail' bill.pk %}" class="font-bold text-brand-600 dark:text-brand-400 hover:underline font-mono">
+                                    {{ bill.receipt_number }}
+                                </a>
+                                <p class="text-xs text-slate-400 font-medium">{{ bill.billing_month }}</p>
+                            </td>
+
+                            <!-- Room & Tenant -->
+                            <td class="px-4 py-3.5 whitespace-nowrap">
+                                <div class="font-semibold text-slate-900 dark:text-white">
+                                    Room {{ bill.room.room_number }}
+                                </div>
+                                <div class="text-xs text-slate-500 flex items-center gap-1">
+                                    <i class="fa-solid fa-user text-[10px] text-slate-400"></i>
+                                    <span>{{ bill.tenant.full_name }}</span>
+                                </div>
+                            </td>
+
+                            <!-- Electricity Sub-Meter -->
+                            <td class="px-4 py-3.5 whitespace-nowrap">
+                                <span class="font-mono text-slate-700 dark:text-slate-300">
+                                    {{ bill.previous_reading }} &rarr; <b>{{ bill.current_reading }}</b>
+                                </span>
+                                <p class="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold">
+                                    {{ bill.units_consumed }} units (₹{{ bill.electricity_bill }})
+                                </p>
+                            </td>
+
+                            <!-- Total Amount -->
+                            <td class="px-4 py-3.5 whitespace-nowrap font-extrabold text-slate-900 dark:text-white">
+                                ₹{{ bill.total_bill }}
+                            </td>
+
+                            <!-- Due Date -->
+                            <td class="px-4 py-3.5 whitespace-nowrap text-xs text-slate-500">
+                                {{ bill.due_date|date:"d M, Y" }}
+                            </td>
+
+                            <!-- 1-Click Status Toggle (HTMX) -->
+                            <td class="px-4 py-3.5 whitespace-nowrap text-center">
+                                {% include 'partials/bill_status_badge.html' with bill=bill %}
+                            </td>
+
+                            <!-- Actions: WhatsApp reminder & PDF Receipt -->
+                            <td class="px-4 py-3.5 whitespace-nowrap text-right space-x-1">
+                                <!-- WhatsApp Deep Link Button -->
+                                <a href="{{ bill.whatsapp_url }}" target="_blank" rel="noopener noreferrer"
+                                   title="Send Bill Reminder on WhatsApp"
+                                   class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white transition-all shadow-sm shadow-emerald-500/20 active:scale-95">
+                                    <i class="fa-brands fa-whatsapp text-base"></i>
+                                </a>
+
+                                <!-- Download PDF Receipt Button -->
+                                <a href="{% url 'bill_receipt_pdf' bill.pk %}" target="_blank"
+                                   title="Download PDF Rent Receipt"
+                                   class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors">
+                                    <i class="fa-solid fa-file-pdf text-rose-500"></i>
+                                </a>
+
+                                <!-- Detail link -->
+                                <a href="{% url 'bill_detail' bill.pk %}"
+                                   title="View Bill Details"
+                                   class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors">
+                                    <i class="fa-solid fa-eye text-xs"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% else %}
+        <div class="p-8 text-center rounded-2xl bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-800 space-y-3">
+            <div class="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-brand-600 dark:text-brand-400 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-file-invoice"></i>
+            </div>
+            <h3 class="text-base font-bold text-slate-800 dark:text-white">Koi Bill Generate Nahi Hua Hai Abhi</h3>
+            <p class="text-xs text-slate-500 max-w-sm mx-auto">
+                Sub-meter reading enter karke 1-click me electricity calculation aur rent bill generate karein.
+            </p>
+            <a href="{% url 'bill_create' %}" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-500 text-white shadow-sm">
+                <i class="fa-solid fa-bolt"></i> Generate First Bill
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
